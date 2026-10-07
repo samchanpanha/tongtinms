@@ -4,6 +4,7 @@ import React, { useEffect, useState, use } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { formatMoney, formatDateTime } from "@/lib/format";
+import { useLanguage } from "@/lib/i18n";
 import { EmptyState } from "@/components/EmptyState";
 import { FileSpreadsheet, ArrowLeft, Loader2, ArrowUpRight, ArrowDownLeft, Shield } from "lucide-react";
 
@@ -15,6 +16,7 @@ export default function GroupLedgerPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
+  const { language, t } = useLanguage();
   const [data, setData] = useState<LedgerData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -31,7 +33,7 @@ export default function GroupLedgerPage({
       })
       .catch((err: unknown) => {
         if (!ignore) {
-          setError(err instanceof Error ? err.message : "Không thể tải sổ cái dây hụi.");
+          setError(err instanceof Error ? err.message : t.groupLedger.defaultError);
           setLoading(false);
         }
       });
@@ -39,7 +41,7 @@ export default function GroupLedgerPage({
     return () => {
       ignore = true;
     };
-  }, [id]);
+  }, [id, t.groupLedger.defaultError]);
 
   if (loading) {
     return (
@@ -54,9 +56,9 @@ export default function GroupLedgerPage({
       <div className="mx-auto max-w-7xl px-4 py-12">
         <EmptyState
           icon={FileSpreadsheet}
-          title="Không thể truy cập sổ cái"
-          description={error || "Dây hụi này chưa có bút toán nào được ghi nhận."}
-          actionText="Quay lại dây hụi"
+          title={t.groupLedger.errorTitle}
+          description={error || t.groupLedger.emptyDesc}
+          actionText={t.groupLedger.backToGroup}
           actionHref={`/host/groups/${id}`}
         />
       </div>
@@ -74,14 +76,14 @@ export default function GroupLedgerPage({
               className="inline-flex items-center gap-1 text-xs font-semibold text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
-              Về phòng hụi
+              {t.groupLedger.backToRoom}
             </Link>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 mt-1">
-            Sổ Cái Bất Biến — {data.groupName}
+            {t.groupLedger.title(data.groupName)}
           </h1>
           <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-            Minh bạch từng dòng tiền vào và ra theo quy chuẩn tài chính ISO ({data.currency})
+            {t.groupLedger.subtitle(data.currency)}
           </p>
         </div>
       </div>
@@ -90,7 +92,7 @@ export default function GroupLedgerPage({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
         <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60">
           <div className="flex items-center justify-between text-xs font-medium text-zinc-500">
-            <span>Tổng tiền vào (IN - Hội viên đóng)</span>
+            <span>{t.groupLedger.totalInTitle}</span>
             <div className="rounded-lg bg-emerald-50 p-2 text-emerald-600 dark:bg-emerald-950/60">
               <ArrowDownLeft className="h-4 w-4" />
             </div>
@@ -102,7 +104,7 @@ export default function GroupLedgerPage({
 
         <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60">
           <div className="flex items-center justify-between text-xs font-medium text-zinc-500">
-            <span>Tổng tiền ra (OUT - Giao hụi & Thảo)</span>
+            <span>{t.groupLedger.totalOutTitle}</span>
             <div className="rounded-lg bg-blue-50 p-2 text-blue-600 dark:bg-blue-950/60">
               <ArrowUpRight className="h-4 w-4" />
             </div>
@@ -114,13 +116,15 @@ export default function GroupLedgerPage({
 
         <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60">
           <div className="flex items-center justify-between text-xs font-medium text-zinc-500">
-            <span>Cân bằng dòng tiền</span>
+            <span>{t.groupLedger.balanceTitle}</span>
             <div className="rounded-lg bg-purple-50 p-2 text-purple-600 dark:bg-purple-950/60">
               <Shield className="h-4 w-4" />
             </div>
           </div>
           <p className="mt-3 text-2xl font-bold text-purple-600 dark:text-purple-400">
-            {data.totalIn.amountMinor === data.totalOut.amountMinor ? "Cân bằng tuyệt đối (100%)" : "Đang xử lý"}
+            {data.totalIn.amountMinor === data.totalOut.amountMinor
+              ? t.groupLedger.balanced100
+              : t.groupLedger.processing}
           </p>
         </div>
       </div>
@@ -130,16 +134,16 @@ export default function GroupLedgerPage({
         <table className="w-full text-left text-sm">
           <thead className="border-b border-zinc-200/80 bg-zinc-50/70 text-xs font-semibold text-zinc-600 dark:border-zinc-800 dark:bg-zinc-800/40 dark:text-zinc-300">
             <tr>
-              <th className="py-3.5 pl-6 pr-3">Mã GD</th>
-              <th className="px-3 py-3.5">Kỳ hụi</th>
-              <th className="px-3 py-3.5">Loại bút toán</th>
-              <th className="px-3 py-3.5">Chiều</th>
-              <th className="px-3 py-3.5">Chân / Người nhận</th>
-              <th className="px-3 py-3.5">Số tiền</th>
-              <th className="px-3 py-3.5">Đã thanh toán</th>
-              <th className="px-3 py-3.5">Còn lại</th>
-              <th className="px-3 py-3.5">Trạng thái</th>
-              <th className="py-3.5 pl-3 pr-6 text-right">Hạn đóng</th>
+              <th className="py-3.5 pl-6 pr-3">{t.groupLedger.colEntryId}</th>
+              <th className="px-3 py-3.5">{t.groupLedger.colCycle}</th>
+              <th className="px-3 py-3.5">{t.groupLedger.colType}</th>
+              <th className="px-3 py-3.5">{t.groupLedger.colDirection}</th>
+              <th className="px-3 py-3.5">{t.groupLedger.colRecipient}</th>
+              <th className="px-3 py-3.5">{t.groupLedger.colAmount}</th>
+              <th className="px-3 py-3.5">{t.groupLedger.colPaid}</th>
+              <th className="px-3 py-3.5">{t.groupLedger.colRemaining}</th>
+              <th className="px-3 py-3.5">{t.groupLedger.colStatus}</th>
+              <th className="py-3.5 pl-3 pr-6 text-right">{t.groupLedger.colDueDate}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60 text-zinc-700 dark:text-zinc-300 text-xs">
@@ -149,28 +153,36 @@ export default function GroupLedgerPage({
                   #{entry.entryId}
                 </td>
                 <td className="px-3 py-3.5 font-bold">
-                  Kỳ {entry.cycleNo}
+                  {t.groupLedger.cycleNo(entry.cycleNo)}
                 </td>
                 <td className="px-3 py-3.5 font-medium">
                   {entry.type === "CONTRIBUTION" && (
-                    <span className="text-zinc-800 dark:text-zinc-200">Đóng hụi (Hội viên)</span>
+                    <span className="text-zinc-800 dark:text-zinc-200">
+                      {t.groupLedger.typeContribution}
+                    </span>
                   )}
                   {entry.type === "PAYOUT" && (
-                    <span className="font-bold text-emerald-600">Giao hụi (Hốt hụi)</span>
+                    <span className="font-bold text-emerald-600">
+                      {t.groupLedger.typePayout}
+                    </span>
                   )}
                   {entry.type === "HOST_FEE" && (
-                    <span className="text-purple-600 font-semibold">Tiền thảo Chủ Hụi</span>
+                    <span className="text-purple-600 font-semibold">
+                      {t.groupLedger.typeHostFee}
+                    </span>
                   )}
                 </td>
                 <td className="px-3 py-3.5 font-mono font-bold">
                   {entry.direction === "IN" ? (
-                    <span className="text-emerald-600">+ THU</span>
+                    <span className="text-emerald-600">{t.groupLedger.dirIn}</span>
                   ) : (
-                    <span className="text-blue-600">- CHI</span>
+                    <span className="text-blue-600">{t.groupLedger.dirOut}</span>
                   )}
                 </td>
                 <td className="px-3 py-3.5 font-semibold">
-                  {entry.memberName ? `${entry.memberName} (Chân #${entry.shareNo})` : "Chủ Hụi"}
+                  {entry.memberName
+                    ? t.groupLedger.recipientMember(entry.memberName, entry.shareNo)
+                    : t.groupLedger.recipientHost}
                 </td>
                 <td className="px-3 py-3.5 font-bold">
                   {formatMoney(entry.amount.amountMinor, entry.amount.currency)}
@@ -195,7 +207,7 @@ export default function GroupLedgerPage({
                   </span>
                 </td>
                 <td className="py-3.5 pl-3 pr-6 text-right text-zinc-500">
-                  {formatDateTime(entry.dueAt)}
+                  {formatDateTime(entry.dueAt, language)}
                 </td>
               </tr>
             ))}

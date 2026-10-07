@@ -9,6 +9,7 @@ import {
   formatPhone,
   getCycleUnitLabel,
 } from "@/lib/format";
+import { useLanguage } from "@/lib/i18n";
 import { GroupStatusBadge, GroupTypeBadge, CycleStatusBadge, ShareStatusBadge } from "@/components/StatusBadge";
 import { EmptyState } from "@/components/EmptyState";
 import {
@@ -37,6 +38,7 @@ export default function GroupDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
+  const { language, t } = useLanguage();
 
   const [group, setGroup] = useState<GroupDetails | null>(null);
   const [shares, setShares] = useState<GroupShare[]>([]);
@@ -87,7 +89,7 @@ export default function GroupDetailPage({
       })
       .catch((err: unknown) => {
         if (!ignore) {
-          setActionError(err instanceof Error ? err.message : "Lỗi khi tải thông tin dây hụi.");
+          setActionError(err instanceof Error ? err.message : t.hostGroupDetail.defaultError);
           setLoading(false);
         }
       });
@@ -95,16 +97,16 @@ export default function GroupDetailPage({
     return () => {
       ignore = true;
     };
-  }, [id, refreshKey]);
+  }, [id, refreshKey, t.hostGroupDetail.defaultError]);
 
   const handleStartGroup = async () => {
     setActionError(null);
     try {
       await api.startGroup(id);
-      setActionSuccess("Đã bắt đầu dây hụi thành công! Trạng thái sẵn sàng (READY).");
+      setActionSuccess(t.hostGroupDetail.msgStartSuccess);
       reloadAll();
     } catch (err: unknown) {
-      setActionError(err instanceof Error ? err.message : "Không thể bắt đầu dây hụi.");
+      setActionError(err instanceof Error ? err.message : t.hostGroupDetail.msgStartError);
     }
   };
 
@@ -112,10 +114,10 @@ export default function GroupDetailPage({
     setActionError(null);
     try {
       const res = await api.openCycle(id);
-      setActionSuccess(`Đã mở thành công Kỳ số ${res.cycleNo}!`);
+      setActionSuccess(t.hostGroupDetail.msgOpenCycleSuccess(res.cycleNo));
       reloadAll();
     } catch (err: unknown) {
-      setActionError(err instanceof Error ? err.message : "Mở kỳ hụi thất bại.");
+      setActionError(err instanceof Error ? err.message : t.hostGroupDetail.msgOpenCycleError);
     }
   };
 
@@ -126,10 +128,10 @@ export default function GroupDetailPage({
     try {
       await api.assignShare(id, selectedMemberId, shareCountToAssign);
       setShowAssignModal(false);
-      setActionSuccess("Đã gán chân hụi cho hội viên thành công!");
+      setActionSuccess(t.hostGroupDetail.msgAssignSuccess);
       reloadAll();
     } catch (err: unknown) {
-      setActionError(err instanceof Error ? err.message : "Gán chân hụi thất bại.");
+      setActionError(err instanceof Error ? err.message : t.hostGroupDetail.msgAssignError);
     }
   };
 
@@ -140,10 +142,10 @@ export default function GroupDetailPage({
     try {
       await api.submitHostBid(bidCycleId, bidShareId, bidAmountMinor);
       setShowBidModal(false);
-      setActionSuccess("Đã ghi nhận thăm hụi thành công!");
+      setActionSuccess(t.hostGroupDetail.msgBidSuccess);
       reloadAll();
     } catch (err: unknown) {
-      setActionError(err instanceof Error ? err.message : "Nhập thăm hụi thất bại.");
+      setActionError(err instanceof Error ? err.message : t.hostGroupDetail.msgBidError);
     }
   };
 
@@ -151,10 +153,10 @@ export default function GroupDetailPage({
     setActionError(null);
     try {
       await api.closeAndCalculate(cycleId);
-      setActionSuccess("Đã chốt kỳ và tính toán sổ cái thành công! Chờ giao tiền hụi.");
+      setActionSuccess(t.hostGroupDetail.msgCloseSuccess);
       reloadAll();
     } catch (err: unknown) {
-      setActionError(err instanceof Error ? err.message : "Chốt kỳ thất bại.");
+      setActionError(err instanceof Error ? err.message : t.hostGroupDetail.msgCloseError);
     }
   };
 
@@ -162,10 +164,10 @@ export default function GroupDetailPage({
     setActionError(null);
     try {
       await api.confirmPayout(cycleId);
-      setActionSuccess("Đã xác nhận giao hụi thành công! Kỳ hụi đã quyết toán (SETTLED).");
+      setActionSuccess(t.hostGroupDetail.msgPayoutSuccess);
       reloadAll();
     } catch (err: unknown) {
-      setActionError(err instanceof Error ? err.message : "Xác nhận giao hụi thất bại.");
+      setActionError(err instanceof Error ? err.message : t.hostGroupDetail.msgPayoutError);
     }
   };
 
@@ -191,10 +193,10 @@ export default function GroupDetailPage({
         idempotencyKey
       );
       setShowPaymentModal(false);
-      setActionSuccess("Ghi nhận đóng tiền hụi thành công!");
+      setActionSuccess(t.hostGroupDetail.msgPaymentSuccess);
       reloadAll();
     } catch (err: unknown) {
-      setActionError(err instanceof Error ? err.message : "Ghi nhận thanh toán thất bại.");
+      setActionError(err instanceof Error ? err.message : t.hostGroupDetail.msgPaymentError);
     }
   };
 
@@ -211,18 +213,25 @@ export default function GroupDetailPage({
       <div className="mx-auto max-w-7xl px-4 py-12">
         <EmptyState
           icon={Layers}
-          title="Không tìm thấy dây hụi"
-          description="Dây hụi này không tồn tại hoặc bạn không có quyền quản lý."
-          actionText="Về bảng điều khiển"
+          title={t.hostGroupDetail.notFoundTitle}
+          description={t.hostGroupDetail.notFoundDesc}
+          actionText={t.hostGroupDetail.backToDashboard}
           actionHref="/host"
         />
       </div>
     );
   }
 
-  const activeCycle = cycles.find((c) => c.status === "OPEN" || c.status === "BIDDING" || c.status === "PAYOUT_PENDING");
-  const canStartGroup = (group.status === "DRAFT" || group.status === "RECRUITING") && shares.length === group.shareCount;
-  const canOpenCycle = (group.status === "READY" || group.status === "RUNNING") && !activeCycle && cycles.length < group.cycleCount;
+  const activeCycle = cycles.find(
+    (c) => c.status === "OPEN" || c.status === "BIDDING" || c.status === "PAYOUT_PENDING"
+  );
+  const canStartGroup =
+    (group.status === "DRAFT" || group.status === "RECRUITING") &&
+    shares.length === group.shareCount;
+  const canOpenCycle =
+    (group.status === "READY" || group.status === "RUNNING") &&
+    !activeCycle &&
+    cycles.length < group.cycleCount;
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-8">
@@ -242,17 +251,29 @@ export default function GroupDetailPage({
             </h1>
             <div className="mt-2 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-zinc-500 dark:text-zinc-400">
               <span>
-                Tiền chân: <strong className="text-zinc-900 dark:text-zinc-100">{formatMoney(group.baseAmount, group.currency)}</strong>
+                {t.hostGroupDetail.baseAmountLabel}{" "}
+                <strong className="text-zinc-900 dark:text-zinc-100">
+                  {formatMoney(group.baseAmount, group.currency)}
+                </strong>
               </span>
               <span>
-                Quy mô: <strong className="text-zinc-900 dark:text-zinc-100">{shares.length}/{group.shareCount} chân</strong>
+                {t.hostGroupDetail.scaleLabel}{" "}
+                <strong className="text-zinc-900 dark:text-zinc-100">
+                  {t.hostGroupDetail.sharesProgress(shares.length, group.shareCount)}
+                </strong>
               </span>
               <span>
-                Kỳ hạn: <strong className="text-zinc-900 dark:text-zinc-100">{group.cycleCount} {getCycleUnitLabel(group.cycleUnit)}</strong>
+                {t.hostGroupDetail.durationLabel}{" "}
+                <strong className="text-zinc-900 dark:text-zinc-100">
+                  {group.cycleCount} {getCycleUnitLabel(group.cycleUnit, language)}
+                </strong>
               </span>
               <span>
-                Tiền thảo: <strong className="text-emerald-600 dark:text-emerald-400">
-                  {group.hostFeeType === "FIXED_PER_CYCLE" ? formatMoney(group.hostFeeMinor, group.currency) : "1%"}
+                {t.hostGroupDetail.hostFeeLabel}{" "}
+                <strong className="text-emerald-600 dark:text-emerald-400">
+                  {group.hostFeeType === "FIXED_PER_CYCLE"
+                    ? formatMoney(group.hostFeeMinor, group.currency)
+                    : "1%"}
                 </strong>
               </span>
             </div>
@@ -264,7 +285,7 @@ export default function GroupDetailPage({
               className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-xs font-semibold text-zinc-700 shadow-sm hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
             >
               <FileSpreadsheet className="h-4 w-4 text-purple-600" />
-              Sổ cái Dây Hụi
+              {t.hostGroupDetail.ledgerBtn}
             </Link>
 
             {canStartGroup && (
@@ -273,7 +294,7 @@ export default function GroupDetailPage({
                 className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-semibold text-white shadow hover:bg-emerald-500 cursor-pointer"
               >
                 <Play className="h-4 w-4" />
-                Kích hoạt Dây Hụi (Khóa chân)
+                {t.hostGroupDetail.startGroupBtn}
               </button>
             )}
 
@@ -283,7 +304,7 @@ export default function GroupDetailPage({
                 className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-semibold text-white shadow hover:bg-emerald-500 cursor-pointer"
               >
                 <PlusCircle className="h-4 w-4" />
-                Mở Kỳ Hụi Số {cycles.length + 1}
+                {t.hostGroupDetail.openCycleBtn(cycles.length + 1)}
               </button>
             )}
           </div>
@@ -314,7 +335,7 @@ export default function GroupDetailPage({
               : "border-transparent text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
           }`}
         >
-          Kỳ Hụi & Tiến Độ ({cycles.length}/{group.cycleCount})
+          {t.hostGroupDetail.tabCycles(cycles.length, group.cycleCount)}
         </button>
         <button
           onClick={() => setActiveTab("shares")}
@@ -324,7 +345,7 @@ export default function GroupDetailPage({
               : "border-transparent text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
           }`}
         >
-          Chân Hụi & Hội Viên ({shares.length}/{group.shareCount})
+          {t.hostGroupDetail.tabShares(shares.length, group.shareCount)}
         </button>
         <button
           onClick={() => setActiveTab("payments")}
@@ -334,7 +355,7 @@ export default function GroupDetailPage({
               : "border-transparent text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
           }`}
         >
-          Khoản Cần Thu ({debts.length})
+          {t.hostGroupDetail.tabPayments(debts.length)}
         </button>
       </div>
 
@@ -344,13 +365,13 @@ export default function GroupDetailPage({
           {cycles.length === 0 ? (
             <EmptyState
               icon={Clock}
-              title="Chưa có kỳ hụi nào được mở"
+              title={t.hostGroupDetail.emptyCyclesTitle}
               description={
                 group.status === "READY" || group.status === "RUNNING"
-                  ? "Dây hụi đã sẵn sàng! Bấm nút bên dưới để mở kỳ hụi đầu tiên."
-                  : `Cần đủ ${group.shareCount} chân hụi và bấm Kích hoạt trước khi mở kỳ.`
+                  ? t.hostGroupDetail.emptyCyclesReadyDesc
+                  : t.hostGroupDetail.emptyCyclesNeedSharesDesc(group.shareCount)
               }
-              actionText={canOpenCycle ? "Mở Kỳ Hụi Đầu Tiên" : undefined}
+              actionText={canOpenCycle ? t.hostGroupDetail.openFirstCycleBtn : undefined}
               onAction={canOpenCycle ? handleOpenCycle : undefined}
             />
           ) : (
@@ -367,16 +388,19 @@ export default function GroupDetailPage({
                       </span>
                       <div>
                         <h3 className="font-bold text-base text-zinc-900 dark:text-zinc-50">
-                          Kỳ Hụi Số {c.cycleNo}
+                          {t.hostGroupDetail.cycleTitle(c.cycleNo)}
                         </h3>
                         <p className="text-xs text-zinc-400">
-                          Mở ngày: {formatDateTime(c.openAt)} • Hạn đóng: {formatDateTime(c.dueAt)}
+                          {t.hostGroupDetail.cycleDates(
+                            formatDateTime(c.openAt, language),
+                            formatDateTime(c.dueAt, language)
+                          )}
                         </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
                       <CycleStatusBadge status={c.status} />
-                      
+
                       {/* Workflow Actions */}
                       {c.status === "BIDDING" && (
                         <div className="flex items-center gap-2">
@@ -388,13 +412,13 @@ export default function GroupDetailPage({
                             }}
                             className="rounded-xl border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800 cursor-pointer"
                           >
-                            + Nhập thăm hộ
+                            {t.hostGroupDetail.enterBidForMemberBtn}
                           </button>
                           <button
                             onClick={() => handleCloseAndCalc(c.id)}
                             className="rounded-xl bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-500 cursor-pointer"
                           >
-                            Chốt kỳ & Tính tiền
+                            {t.hostGroupDetail.closeAndCalcBtn}
                           </button>
                         </div>
                       )}
@@ -404,7 +428,7 @@ export default function GroupDetailPage({
                           onClick={() => handleCloseAndCalc(c.id)}
                           className="rounded-xl bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-500 cursor-pointer"
                         >
-                          Chốt kỳ & Tính tiền
+                          {t.hostGroupDetail.closeAndCalcBtn}
                         </button>
                       )}
 
@@ -413,7 +437,7 @@ export default function GroupDetailPage({
                           onClick={() => handleConfirmPayout(c.id)}
                           className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 cursor-pointer"
                         >
-                          Xác nhận Đã Giao Tiền
+                          {t.hostGroupDetail.confirmPayoutBtn}
                         </button>
                       )}
                     </div>
@@ -422,25 +446,27 @@ export default function GroupDetailPage({
                   {/* Financial outcome */}
                   <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
                     <div className="rounded-xl bg-zinc-50 p-3 dark:bg-zinc-800/40">
-                      <span className="text-zinc-500">Thăm trúng (Bỏ hụi):</span>
+                      <span className="text-zinc-500">{t.hostGroupDetail.winningBidLabel}</span>
                       <p className="font-bold text-sm text-zinc-900 dark:text-zinc-50 mt-1">
                         {formatMoney(c.winningBid, c.currency)}
                       </p>
                     </div>
                     <div className="rounded-xl bg-zinc-50 p-3 dark:bg-zinc-800/40">
-                      <span className="text-zinc-500">Tổng tiền gom:</span>
+                      <span className="text-zinc-500">{t.hostGroupDetail.grossPotLabel}</span>
                       <p className="font-bold text-sm text-zinc-900 dark:text-zinc-50 mt-1">
                         {formatMoney(c.grossPot, c.currency)}
                       </p>
                     </div>
                     <div className="rounded-xl bg-zinc-50 p-3 dark:bg-zinc-800/40">
-                      <span className="text-zinc-500">Tiền thảo Chủ Hụi:</span>
+                      <span className="text-zinc-500">{t.hostGroupDetail.hostFeeOutcomeLabel}</span>
                       <p className="font-bold text-sm text-emerald-600 dark:text-emerald-400 mt-1">
                         {formatMoney(c.hostFee, c.currency)}
                       </p>
                     </div>
                     <div className="rounded-xl bg-emerald-50 p-3 dark:bg-emerald-950/30 border border-emerald-500/20">
-                      <span className="text-emerald-800 dark:text-emerald-300 font-medium">Thực nhận (Giao hụi):</span>
+                      <span className="text-emerald-800 dark:text-emerald-300 font-medium">
+                        {t.hostGroupDetail.netPayoutLabel}
+                      </span>
                       <p className="font-bold text-sm text-emerald-700 dark:text-emerald-200 mt-1">
                         {formatMoney(c.netPayout, c.currency)}
                       </p>
@@ -458,7 +484,7 @@ export default function GroupDetailPage({
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <h3 className="font-bold text-base text-zinc-900 dark:text-zinc-50">
-              Danh sách {shares.length}/{group.shareCount} Chân Hụi
+              {t.hostGroupDetail.sharesHeader(shares.length, group.shareCount)}
             </h3>
             {group.status === "DRAFT" || group.status === "RECRUITING" ? (
               <button
@@ -466,7 +492,7 @@ export default function GroupDetailPage({
                 className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-emerald-500 cursor-pointer"
               >
                 <PlusCircle className="h-4 w-4" />
-                Gán thêm chân hụi
+                {t.hostGroupDetail.assignMoreSharesBtn}
               </button>
             ) : null}
           </div>
@@ -475,18 +501,18 @@ export default function GroupDetailPage({
             <table className="w-full text-left text-sm">
               <thead className="border-b border-zinc-200/80 bg-zinc-50/70 text-xs font-semibold text-zinc-600 dark:border-zinc-800 dark:bg-zinc-800/40 dark:text-zinc-300">
                 <tr>
-                  <th className="py-3.5 pl-6 pr-3">Số chân</th>
-                  <th className="px-3 py-3.5">Tên Hội Viên</th>
-                  <th className="px-3 py-3.5">Số điện thoại</th>
-                  <th className="px-3 py-3.5">Trạng thái chân</th>
-                  <th className="py-3.5 pl-3 pr-6 text-right">Kỳ đã hốt</th>
+                  <th className="py-3.5 pl-6 pr-3">{t.hostGroupDetail.colShareNo}</th>
+                  <th className="px-3 py-3.5">{t.hostGroupDetail.colMemberName}</th>
+                  <th className="px-3 py-3.5">{t.hostGroupDetail.colPhone}</th>
+                  <th className="px-3 py-3.5">{t.hostGroupDetail.colShareStatus}</th>
+                  <th className="py-3.5 pl-3 pr-6 text-right">{t.hostGroupDetail.colWonCycle}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60 text-zinc-700 dark:text-zinc-300">
                 {shares.map((s) => (
                   <tr key={s.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30">
                     <td className="py-3.5 pl-6 pr-3 font-mono font-bold text-xs text-zinc-500">
-                      Chân #{s.shareNo}
+                      {t.hostGroupDetail.shareNoBadge(s.shareNo)}
                     </td>
                     <td className="px-3 py-3.5 font-semibold text-zinc-900 dark:text-zinc-50">
                       {s.memberName}
@@ -498,7 +524,7 @@ export default function GroupDetailPage({
                       <ShareStatusBadge status={s.status} />
                     </td>
                     <td className="py-3.5 pl-3 pr-6 text-right font-medium text-xs">
-                      {s.wonCycleId ? `Kỳ #${s.wonCycleId}` : "—"}
+                      {s.wonCycleId ? t.hostGroupDetail.cycleNoBadge(s.wonCycleId) : "—"}
                     </td>
                   </tr>
                 ))}
@@ -513,41 +539,41 @@ export default function GroupDetailPage({
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <h3 className="font-bold text-base text-zinc-900 dark:text-zinc-50">
-              Khoản Hụi Cần Thu Theo Kỳ
+              {t.hostGroupDetail.paymentsHeader}
             </h3>
             <span className="text-xs text-zinc-500">
-              Tổng số: <strong>{debts.length}</strong> suất chưa hoàn tất
+              {t.hostGroupDetail.totalPending(debts.length)}
             </span>
           </div>
 
           {debts.length === 0 ? (
             <EmptyState
               icon={Coins}
-              title="Không có khoản đóng nào tồn đọng"
-              description="Tất cả hội viên đã thanh toán đầy đủ các kỳ hiện tại."
+              title={t.hostGroupDetail.emptyDebtsTitle}
+              description={t.hostGroupDetail.emptyDebtsDesc}
             />
           ) : (
             <div className="overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60">
               <table className="w-full text-left text-sm">
                 <thead className="border-b border-zinc-200/80 bg-zinc-50/70 text-xs font-semibold text-zinc-600 dark:border-zinc-800 dark:bg-zinc-800/40 dark:text-zinc-300">
                   <tr>
-                    <th className="py-3.5 pl-6 pr-3">Kỳ hụi</th>
-                    <th className="px-3 py-3.5">Chân hụi</th>
-                    <th className="px-3 py-3.5">Số tiền cần đóng</th>
-                    <th className="px-3 py-3.5">Đã đóng</th>
-                    <th className="px-3 py-3.5">Còn nợ</th>
-                    <th className="px-3 py-3.5">Hạn đóng</th>
-                    <th className="py-3.5 pl-3 pr-6 text-right">Thao tác</th>
+                    <th className="py-3.5 pl-6 pr-3">{t.hostGroupDetail.colCycle}</th>
+                    <th className="px-3 py-3.5">{t.hostGroupDetail.colShare}</th>
+                    <th className="px-3 py-3.5">{t.hostGroupDetail.colAmountDue}</th>
+                    <th className="px-3 py-3.5">{t.hostGroupDetail.colPaid}</th>
+                    <th className="px-3 py-3.5">{t.hostGroupDetail.colRemaining}</th>
+                    <th className="px-3 py-3.5">{t.hostGroupDetail.colDueDate}</th>
+                    <th className="py-3.5 pl-3 pr-6 text-right">{t.hostGroupDetail.colActions}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60 text-zinc-700 dark:text-zinc-300">
                   {debts.map((d) => (
                     <tr key={d.ledgerEntryId} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30">
                       <td className="py-3.5 pl-6 pr-3 font-semibold">
-                        Kỳ #{d.cycleNo}
+                        {t.hostGroupDetail.cycleNoBadge(d.cycleNo)}
                       </td>
                       <td className="px-3 py-3.5 font-mono text-xs">
-                        Chân #{d.shareId}
+                        {t.hostGroupDetail.shareNoBadge(d.shareId)}
                       </td>
                       <td className="px-3 py-3.5 font-medium">
                         {formatMoney(d.amountMinor, d.currency)}
@@ -559,7 +585,7 @@ export default function GroupDetailPage({
                         {formatMoney(d.remainingMinor, d.currency)}
                       </td>
                       <td className="px-3 py-3.5 text-xs text-zinc-500">
-                        {formatDateTime(d.dueAt)}
+                        {formatDateTime(d.dueAt, language)}
                       </td>
                       <td className="py-3.5 pl-3 pr-6 text-right">
                         <button
@@ -570,7 +596,7 @@ export default function GroupDetailPage({
                           className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 cursor-pointer"
                         >
                           <CreditCard className="h-3.5 w-3.5" />
-                          Thu tiền
+                          {t.hostGroupDetail.collectMoneyBtn}
                         </button>
                       </td>
                     </tr>
@@ -588,7 +614,7 @@ export default function GroupDetailPage({
           <div className="w-full max-w-md rounded-3xl border border-zinc-200 bg-white p-6 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900">
             <div className="flex items-center justify-between pb-4 border-b border-zinc-200 dark:border-zinc-800">
               <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-50">
-                Gán Chân Hụi Cho Hội Viên
+                {t.hostGroupDetail.assignModalTitle}
               </h3>
               <button
                 onClick={() => setShowAssignModal(false)}
@@ -601,7 +627,7 @@ export default function GroupDetailPage({
             <form onSubmit={handleAssignShare} className="mt-4 space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                  Chọn Hội Viên *
+                  {t.hostGroupDetail.selectMemberLabel}
                 </label>
                 <select
                   required
@@ -609,7 +635,7 @@ export default function GroupDetailPage({
                   onChange={(e) => setSelectedMemberId(Number(e.target.value))}
                   className="mt-1 w-full rounded-xl border border-zinc-200 bg-zinc-50/50 py-2.5 px-3.5 text-sm text-zinc-900 outline-none focus:border-emerald-500 focus:bg-white dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-100"
                 >
-                  <option value="">-- Chọn hội viên từ danh bạ --</option>
+                  <option value="">{t.hostGroupDetail.selectMemberPlaceholder}</option>
                   {members.map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.fullName} ({formatPhone(m.phone)})
@@ -620,7 +646,7 @@ export default function GroupDetailPage({
 
               <div>
                 <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                  Số lượng chân gán
+                  {t.hostGroupDetail.shareCountToAssignLabel}
                 </label>
                 <input
                   type="number"
@@ -639,13 +665,13 @@ export default function GroupDetailPage({
                   onClick={() => setShowAssignModal(false)}
                   className="rounded-xl px-4 py-2 text-xs font-semibold text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400"
                 >
-                  Hủy
+                  {t.hostGroupDetail.cancelBtn}
                 </button>
                 <button
                   type="submit"
                   className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-500"
                 >
-                  Gán chân hụi
+                  {t.hostGroupDetail.assignConfirmBtn}
                 </button>
               </div>
             </form>
@@ -659,7 +685,7 @@ export default function GroupDetailPage({
           <div className="w-full max-w-md rounded-3xl border border-zinc-200 bg-white p-6 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900">
             <div className="flex items-center justify-between pb-4 border-b border-zinc-200 dark:border-zinc-800">
               <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-50">
-                Nhập Thăm Hụi (Chủ Hụi Nhập Hộ)
+                {t.hostGroupDetail.bidModalTitle}
               </h3>
               <button
                 onClick={() => setShowBidModal(false)}
@@ -672,7 +698,7 @@ export default function GroupDetailPage({
             <form onSubmit={handleSubmitBid} className="mt-4 space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                  Chọn chân hụi bỏ giá *
+                  {t.hostGroupDetail.selectAliveShareLabel}
                 </label>
                 <select
                   required
@@ -684,7 +710,7 @@ export default function GroupDetailPage({
                     .filter((s) => s.status === "ALIVE")
                     .map((s) => (
                       <option key={s.id} value={s.id}>
-                        Chân #{s.shareNo} — {s.memberName}
+                        {t.hostGroupDetail.bidShareOption(s.shareNo, s.memberName)}
                       </option>
                     ))}
                 </select>
@@ -692,7 +718,7 @@ export default function GroupDetailPage({
 
               <div>
                 <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                  Mức thăm bỏ (VND) *
+                  {t.hostGroupDetail.bidAmountLabel(group.currency)}
                 </label>
                 <input
                   type="number"
@@ -712,13 +738,13 @@ export default function GroupDetailPage({
                   onClick={() => setShowBidModal(false)}
                   className="rounded-xl px-4 py-2 text-xs font-semibold text-zinc-600 hover:bg-zinc-100"
                 >
-                  Hủy
+                  {t.hostGroupDetail.cancelBtn}
                 </button>
                 <button
                   type="submit"
                   className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-500"
                 >
-                  Lưu thăm hụi
+                  {t.hostGroupDetail.saveBidBtn}
                 </button>
               </div>
             </form>
@@ -732,7 +758,7 @@ export default function GroupDetailPage({
           <div className="w-full max-w-md rounded-3xl border border-zinc-200 bg-white p-6 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900">
             <div className="flex items-center justify-between pb-4 border-b border-zinc-200 dark:border-zinc-800">
               <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-50">
-                Ghi Nhận Đóng Tiền Hụi
+                {t.hostGroupDetail.paymentModalTitle}
               </h3>
               <button
                 onClick={() => setShowPaymentModal(false)}
@@ -745,15 +771,19 @@ export default function GroupDetailPage({
             <form onSubmit={handleRecordPayment} className="mt-4 space-y-4">
               <div className="rounded-xl bg-zinc-50 p-3.5 text-xs dark:bg-zinc-800/40 space-y-1">
                 <div className="flex justify-between">
-                  <span className="text-zinc-500">Kỳ hụi:</span>
-                  <span className="font-bold">Kỳ #{paymentDebt.cycleNo}</span>
+                  <span className="text-zinc-500">{t.hostGroupDetail.paymentCycleLabel}</span>
+                  <span className="font-bold">
+                    {t.hostGroupDetail.cycleNoBadge(paymentDebt.cycleNo)}
+                  </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-zinc-500">Chân hụi:</span>
-                  <span className="font-bold">Chân #{paymentDebt.shareId}</span>
+                  <span className="text-zinc-500">{t.hostGroupDetail.paymentShareLabel}</span>
+                  <span className="font-bold">
+                    {t.hostGroupDetail.shareNoBadge(paymentDebt.shareId)}
+                  </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-zinc-500">Số tiền thu:</span>
+                  <span className="text-zinc-500">{t.hostGroupDetail.paymentAmountLabel}</span>
                   <span className="font-bold text-emerald-600">
                     {formatMoney(paymentDebt.remainingMinor, paymentDebt.currency)}
                   </span>
@@ -762,16 +792,16 @@ export default function GroupDetailPage({
 
               <div>
                 <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                  Phương thức thanh toán
+                  {t.hostGroupDetail.paymentMethodLabel}
                 </label>
                 <select
                   value={paymentMethod}
                   onChange={(e) => setPaymentMethod(e.target.value)}
                   className="mt-1 w-full rounded-xl border border-zinc-200 bg-zinc-50/50 py-2.5 px-3.5 text-sm text-zinc-900 outline-none focus:border-emerald-500 dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-100"
                 >
-                  <option value="CASH">Tiền mặt (CASH)</option>
-                  <option value="BANK_TRANSFER">Chuyển khoản ngân hàng (BANK_TRANSFER)</option>
-                  <option value="OTHER">Khác</option>
+                  <option value="CASH">{t.hostGroupDetail.methodCash}</option>
+                  <option value="BANK_TRANSFER">{t.hostGroupDetail.methodBank}</option>
+                  <option value="OTHER">{t.hostGroupDetail.methodOther}</option>
                 </select>
               </div>
 
@@ -781,13 +811,13 @@ export default function GroupDetailPage({
                   onClick={() => setShowPaymentModal(false)}
                   className="rounded-xl px-4 py-2 text-xs font-semibold text-zinc-600 hover:bg-zinc-100"
                 >
-                  Hủy
+                  {t.hostGroupDetail.cancelBtn}
                 </button>
                 <button
                   type="submit"
                   className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-500"
                 >
-                  Xác nhận đã thu tiền
+                  {t.hostGroupDetail.confirmPaymentBtn}
                 </button>
               </div>
             </form>

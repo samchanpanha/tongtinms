@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api, getStoredAuth } from "@/lib/api";
+import { useLanguage } from "@/lib/i18n";
 import { GroupStatusBadge, GroupTypeBadge, CycleStatusBadge } from "@/components/StatusBadge";
 import { EmptyState } from "@/components/EmptyState";
 import { Wallet, ArrowRight, Loader2, AlertCircle } from "lucide-react";
@@ -12,6 +13,7 @@ type MyGroup = Awaited<ReturnType<typeof api.getMyGroups>>[number];
 
 export default function MemberPortalPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [groups, setGroups] = useState<MyGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +36,7 @@ export default function MemberPortalPage() {
       })
       .catch((err: unknown) => {
         if (!ignore) {
-          setError(err instanceof Error ? err.message : "Không thể tải danh sách dây hụi của bạn.");
+          setError(err instanceof Error ? err.message : t.memberPortal.defaultError);
           setLoading(false);
         }
       });
@@ -42,7 +44,7 @@ export default function MemberPortalPage() {
     return () => {
       ignore = true;
     };
-  }, [router]);
+  }, [router, t.memberPortal.defaultError]);
 
   if (loading) {
     return (
@@ -62,10 +64,10 @@ export default function MemberPortalPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-              Cổng Thông Tin Hội Viên
+              {t.memberPortal.title}
             </h1>
             <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-              Theo dõi dây hụi bạn tham gia, bỏ thăm kín bảo mật và xem sao kê vị thế tài chính
+              {t.memberPortal.subtitle}
             </p>
           </div>
         </div>
@@ -82,7 +84,7 @@ export default function MemberPortalPage() {
       <div>
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-            Dây Hụi Đang Tham Gia
+            {t.memberPortal.joinedGroupsTitle}
             <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
               {groups.length}
             </span>
@@ -92,8 +94,8 @@ export default function MemberPortalPage() {
         {groups.length === 0 ? (
           <EmptyState
             icon={Wallet}
-            title="Bạn chưa tham gia dây hụi nào"
-            description="Khi Chủ Hụi thêm số điện thoại của bạn vào chân hụi, dây hụi sẽ tự động xuất hiện tại đây."
+            title={t.memberPortal.emptyTitle}
+            description={t.memberPortal.emptyDesc}
           />
         ) : (
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -118,23 +120,25 @@ export default function MemberPortalPage() {
                   <div className="mt-3 flex items-center gap-2">
                     <GroupTypeBadge type={g.type} />
                     <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                      Tổng {g.shareCount} chân • {g.cycleCount} kỳ
+                      {t.memberPortal.totalSharesAndCycles(g.shareCount, g.cycleCount)}
                     </span>
                   </div>
 
                   <div className="mt-6 space-y-2 rounded-xl bg-zinc-50 p-3.5 text-xs dark:bg-zinc-800/40">
                     <div className="flex justify-between items-center">
-                      <span className="text-zinc-500">Chân hụi sở hữu:</span>
+                      <span className="text-zinc-500">{t.memberPortal.ownedSharesLabel}</span>
                       <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                        {g.myShareCount} chân hụi
+                        {t.memberPortal.ownedSharesValue(g.myShareCount)}
                       </span>
                     </div>
 
                     <div className="flex justify-between items-center">
-                      <span className="text-zinc-500">Tiến độ kỳ:</span>
+                      <span className="text-zinc-500">{t.memberPortal.cycleProgressLabel}</span>
                       <div className="flex items-center gap-1.5">
                         <span className="font-semibold text-zinc-800 dark:text-zinc-200">
-                          {g.currentCycleNo ? `Kỳ ${g.currentCycleNo}/${g.cycleCount}` : "Chưa mở kỳ"}
+                          {g.currentCycleNo
+                            ? t.memberPortal.cycleOf(g.currentCycleNo, g.cycleCount)
+                            : t.memberPortal.notOpenedYet}
                         </span>
                         {g.currentCycleStatus && (
                           <CycleStatusBadge status={g.currentCycleStatus} />
@@ -145,14 +149,12 @@ export default function MemberPortalPage() {
                 </div>
 
                 <div className="mt-6 pt-4 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
-                  <span className="text-xs text-zinc-500">
-                    {g.currency}
-                  </span>
+                  <span className="text-xs text-zinc-500">{g.currency}</span>
                   <Link
                     href={`/app/groups/${g.id}`}
                     className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600 hover:text-emerald-500 group-hover:translate-x-0.5 transition-all"
                   >
-                    Xem chi tiết & Sao kê
+                    {t.memberPortal.viewDetailsAndStatement}
                     <ArrowRight className="h-3.5 w-3.5" />
                   </Link>
                 </div>

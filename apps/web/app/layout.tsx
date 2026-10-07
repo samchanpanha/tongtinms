@@ -1,21 +1,11 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Navbar } from "@/components/Navbar";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+import { LanguageProvider } from "@/lib/i18n";
 
 export const metadata: Metadata = {
-  title: "Tong Tin Manager — Quản lý Hụi / Hội Minh Bạch",
-  description: "Hệ thống quản lý hụi / hội / ROSCA hiện đại, minh bạch, bảo mật tuyệt đối.",
+  title: "Tong Tin Manager — ប្រព័ន្ធគ្រប់គ្រងតុងទីនប្រកបដោយតម្លាភាព",
+  description: "ប្រព័ន្ធគ្រប់គ្រងតុងទីន (ROSCA) ទំនើប តម្លាភាព និងសុវត្ថិភាពខ្ពស់បំផុត។",
 };
 
 export default function RootLayout({
@@ -24,13 +14,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="vi"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
+    <html lang="km" className="h-full antialiased">
       <body className="min-h-full flex flex-col bg-zinc-50 font-sans text-zinc-900 dark:bg-zinc-950 dark:text-zinc-50">
-        <Navbar />
-        <main className="flex-1">{children}</main>
+        <LanguageProvider>
+          <Navbar />
+          <main className="flex-1">{children}</main>
+        </LanguageProvider>
       </body>
     </html>
   );

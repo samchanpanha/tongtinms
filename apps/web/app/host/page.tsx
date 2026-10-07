@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api, getStoredAuth } from "@/lib/api";
 import { formatMoney, formatDateTime } from "@/lib/format";
+import { useLanguage } from "@/lib/i18n";
 import { StatCard } from "@/components/StatCard";
 import { EmptyState } from "@/components/EmptyState";
 import { GroupStatusBadge, GroupTypeBadge, CycleStatusBadge } from "@/components/StatusBadge";
@@ -21,6 +22,7 @@ import {
 
 export default function HostDashboardPage() {
   const router = useRouter();
+  const { language, t } = useLanguage();
   const [data, setData] = useState<Awaited<ReturnType<typeof api.getHostDashboard>> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,7 +46,7 @@ export default function HostDashboardPage() {
       })
       .catch((err: unknown) => {
         if (!ignore) {
-          setError(err instanceof Error ? err.message : "Không thể tải dữ liệu bảng điều khiển.");
+          setError(err instanceof Error ? err.message : t.hostDashboard.defaultError);
           setLoading(false);
         }
       });
@@ -52,14 +54,14 @@ export default function HostDashboardPage() {
     return () => {
       ignore = true;
     };
-  }, [router, refreshKey]);
+  }, [router, refreshKey, t.hostDashboard.defaultError]);
 
   if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="flex flex-col items-center gap-3 text-zinc-500">
           <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
-          <p className="text-sm">Đang tải bảng điều khiển Chủ Hụi...</p>
+          <p className="text-sm">{t.hostDashboard.loading}</p>
         </div>
       </div>
     );
@@ -72,7 +74,7 @@ export default function HostDashboardPage() {
           <div className="flex items-center gap-3">
             <ShieldAlert className="h-6 w-6 shrink-0" />
             <div>
-              <h3 className="text-base font-bold">Lỗi truy xuất dữ liệu</h3>
+              <h3 className="text-base font-bold">{t.hostDashboard.errorTitle}</h3>
               <p className="text-sm mt-1">{error}</p>
             </div>
           </div>
@@ -81,9 +83,9 @@ export default function HostDashboardPage() {
               setLoading(true);
               setRefreshKey((k) => k + 1);
             }}
-            className="mt-4 rounded-xl bg-rose-700 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-600 transition-colors"
+            className="mt-4 rounded-xl bg-rose-700 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-600 transition-colors cursor-pointer"
           >
-            Thử lại
+            {t.hostDashboard.retry}
           </button>
         </div>
       </div>
@@ -94,6 +96,7 @@ export default function HostDashboardPage() {
   const currencies = data?.currencies || [];
   const totalUnpaid = groups.reduce((acc, g) => acc + g.unpaidCount, 0);
   const totalOverdue = groups.reduce((acc, g) => acc + g.overdueCount, 0);
+  const runningCount = groups.filter((g) => g.status === "RUNNING").length;
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -101,10 +104,10 @@ export default function HostDashboardPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-8 border-b border-zinc-200 dark:border-zinc-800">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-            Bảng Điều Khiển Chủ Hụi
+            {t.hostDashboard.title}
           </h1>
           <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            Theo dõi dòng tiền, tiến độ các dây hụi và quản lý các kỳ thanh toán
+            {t.hostDashboard.subtitle}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -112,14 +115,14 @@ export default function HostDashboardPage() {
             href="/host/members"
             className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-xs font-semibold text-zinc-700 shadow-sm hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 transition-colors"
           >
-            Danh sách Hội Viên
+            {t.hostDashboard.memberListBtn}
           </Link>
           <Link
             href="/host/groups/new"
             className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-semibold text-white shadow-md shadow-emerald-600/20 hover:bg-emerald-500 transition-colors"
           >
             <PlusCircle className="h-4 w-4" />
-            Tạo dây hụi mới
+            {t.hostDashboard.createGroupBtn}
           </Link>
         </div>
       </div>
@@ -130,19 +133,19 @@ export default function HostDashboardPage() {
           currencies.map((c) => (
             <StatCard
               key={c.currency}
-              title={`Lợi nhuận tiền thảo (${c.currency})`}
+              title={t.hostDashboard.profitTitle(c.currency)}
               value={formatMoney(c.amountMinor, c.currency, c.exponent)}
-              subtitle="Tổng từ các kỳ đã quyết toán"
+              subtitle={t.hostDashboard.profitSubtitle}
               icon={TrendingUp}
-              badge="Tiền thảo thực thu"
+              badge={t.hostDashboard.profitBadge}
               badgeColor="emerald"
             />
           ))
         ) : (
           <StatCard
-            title="Lợi nhuận tiền thảo"
+            title={t.hostDashboard.profitTitleDefault}
             value="0 đ"
-            subtitle="Chưa có kỳ hụi quyết toán"
+            subtitle={t.hostDashboard.profitSubtitleEmpty}
             icon={TrendingUp}
             badge="VND"
             badgeColor="emerald"
@@ -150,29 +153,29 @@ export default function HostDashboardPage() {
         )}
 
         <StatCard
-          title="Tổng dây hụi"
+          title={t.hostDashboard.totalGroupsTitle}
           value={groups.length}
-          subtitle={`${groups.filter((g) => g.status === "RUNNING").length} dây đang chạy`}
+          subtitle={t.hostDashboard.runningGroupsSubtitle(runningCount)}
           icon={Layers}
-          badge={`${groups.length} dây`}
+          badge={t.hostDashboard.groupsBadge(groups.length)}
           badgeColor="blue"
         />
 
         <StatCard
-          title="Khoản hụi chưa thu"
+          title={t.hostDashboard.unpaidTitle}
           value={totalUnpaid}
-          subtitle="Suất đóng cần thu trong các kỳ"
+          subtitle={t.hostDashboard.unpaidSubtitle}
           icon={Coins}
-          badge={totalUnpaid > 0 ? "Cần thu" : "Đã thu hết"}
+          badge={totalUnpaid > 0 ? t.hostDashboard.unpaidBadgeNeed : t.hostDashboard.unpaidBadgeDone}
           badgeColor={totalUnpaid > 0 ? "amber" : "emerald"}
         />
 
         <StatCard
-          title="Khoản đóng quá hạn"
+          title={t.hostDashboard.overdueTitle}
           value={totalOverdue}
-          subtitle="Số suất hụi trễ hạn thanh toán"
+          subtitle={t.hostDashboard.overdueSubtitle}
           icon={AlertTriangle}
-          badge={totalOverdue > 0 ? "Cần nhắc nợ" : "Tốt"}
+          badge={totalOverdue > 0 ? t.hostDashboard.overdueBadgeAlert : t.hostDashboard.overdueBadgeGood}
           badgeColor={totalOverdue > 0 ? "rose" : "emerald"}
         />
       </div>
@@ -181,7 +184,7 @@ export default function HostDashboardPage() {
       <div className="mt-12">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-            Danh sách Dây Hụi
+            {t.hostDashboard.groupsListTitle}
             <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
               {groups.length}
             </span>
@@ -190,16 +193,16 @@ export default function HostDashboardPage() {
             href="/host/groups/new"
             className="text-xs font-semibold text-emerald-600 hover:text-emerald-500 inline-flex items-center gap-1"
           >
-            + Mở thêm dây hụi
+            {t.hostDashboard.openMoreGroup}
           </Link>
         </div>
 
         {groups.length === 0 ? (
           <EmptyState
             icon={Layers}
-            title="Chưa có dây hụi nào"
-            description="Bắt đầu tạo dây hụi mới (hụi đấu hoặc hụi thảo) để gom chân và mở các kỳ hụi."
-            actionText="Tạo dây hụi đầu tiên"
+            title={t.hostDashboard.emptyTitle}
+            description={t.hostDashboard.emptyDesc}
+            actionText={t.hostDashboard.emptyAction}
             actionHref="/host/groups/new"
           />
         ) : (
@@ -225,16 +228,18 @@ export default function HostDashboardPage() {
                   <div className="mt-3 flex items-center gap-2">
                     <GroupTypeBadge type={group.type} />
                     <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                      {group.shareCount} chân • {group.cycleCount} kỳ
+                      {t.hostDashboard.sharesAndCycles(group.shareCount, group.cycleCount)}
                     </span>
                   </div>
 
                   <div className="mt-6 space-y-2.5 rounded-xl bg-zinc-50 p-3.5 text-xs dark:bg-zinc-800/40">
                     <div className="flex justify-between items-center">
-                      <span className="text-zinc-500 dark:text-zinc-400">Tiến độ kỳ:</span>
+                      <span className="text-zinc-500 dark:text-zinc-400">{t.hostDashboard.cycleProgress}</span>
                       <div className="flex items-center gap-1.5">
                         <span className="font-semibold text-zinc-800 dark:text-zinc-200">
-                          {group.currentCycleNo ? `Kỳ ${group.currentCycleNo}/${group.cycleCount}` : "Chưa mở kỳ"}
+                          {group.currentCycleNo
+                            ? t.hostDashboard.cycleOf(group.currentCycleNo, group.cycleCount)
+                            : t.hostDashboard.notOpenedYet}
                         </span>
                         {group.currentCycleStatus && (
                           <CycleStatusBadge status={group.currentCycleStatus} />
@@ -243,28 +248,28 @@ export default function HostDashboardPage() {
                     </div>
 
                     <div className="flex justify-between items-center">
-                      <span className="text-zinc-500 dark:text-zinc-400">Hạn đóng tiếp theo:</span>
+                      <span className="text-zinc-500 dark:text-zinc-400">{t.hostDashboard.nextDue}</span>
                       <span className="font-medium text-zinc-700 dark:text-zinc-300">
-                        {formatDateTime(group.nextDueAt)}
+                        {formatDateTime(group.nextDueAt, language)}
                       </span>
                     </div>
 
                     <div className="flex justify-between items-center pt-1 border-t border-zinc-200/60 dark:border-zinc-700/60">
-                      <span className="text-zinc-500 dark:text-zinc-400">Chưa thu / Quá hạn:</span>
+                      <span className="text-zinc-500 dark:text-zinc-400">{t.hostDashboard.unpaidOverdueLabel}</span>
                       <div className="flex items-center gap-1.5">
                         <span className="font-semibold text-amber-600 dark:text-amber-400">
-                          {group.unpaidCount} chưa thu
+                          {t.hostDashboard.unpaidCount(group.unpaidCount)}
                         </span>
                         {group.overdueCount > 0 && (
                           <span className="font-semibold text-rose-600 dark:text-rose-400">
-                            • {group.overdueCount} trễ
+                            {t.hostDashboard.overdueCount(group.overdueCount)}
                           </span>
                         )}
                       </div>
                     </div>
 
                     <div className="flex justify-between items-center pt-1 border-t border-zinc-200/60 dark:border-zinc-700/60">
-                      <span className="text-zinc-500 dark:text-zinc-400">Tiền thảo tích lũy:</span>
+                      <span className="text-zinc-500 dark:text-zinc-400">{t.hostDashboard.accumulatedFee}</span>
                       <span className="font-bold text-emerald-600 dark:text-emerald-400">
                         {formatMoney(group.hostProfitMinor, group.currency)}
                       </span>
@@ -277,13 +282,13 @@ export default function HostDashboardPage() {
                     href={`/host/groups/${group.id}/ledger`}
                     className="text-xs font-semibold text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 transition-colors"
                   >
-                    Xem Sổ cái
+                    {t.hostDashboard.viewLedger}
                   </Link>
                   <Link
                     href={`/host/groups/${group.id}`}
                     className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600 hover:text-emerald-500 group-hover:translate-x-0.5 transition-all"
                   >
-                    Vào phòng hụi
+                    {t.hostDashboard.enterGroupRoom}
                     <ArrowRight className="h-3.5 w-3.5" />
                   </Link>
                 </div>

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api, getStoredAuth } from "@/lib/api";
 import { formatPhone, formatDate } from "@/lib/format";
+import { useLanguage } from "@/lib/i18n";
 import { EmptyState } from "@/components/EmptyState";
 import {
   Users,
@@ -25,6 +26,7 @@ type MemberItem = Awaited<ReturnType<typeof api.getMembers>>[number];
 
 export default function MembersDirectoryPage() {
   const router = useRouter();
+  const { language, t } = useLanguage();
   const [members, setMembers] = useState<MemberItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
@@ -69,7 +71,7 @@ export default function MembersDirectoryPage() {
       })
       .catch((err: unknown) => {
         if (!ignore) {
-          setError(err instanceof Error ? err.message : "Không thể tải danh sách hội viên.");
+          setError(err instanceof Error ? err.message : t.membersDirectory.defaultError);
           setLoading(false);
         }
       });
@@ -77,7 +79,7 @@ export default function MembersDirectoryPage() {
     return () => {
       ignore = true;
     };
-  }, [router, refreshKey, submittedQuery]);
+  }, [router, refreshKey, submittedQuery, t.membersDirectory.defaultError]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,7 +105,7 @@ export default function MembersDirectoryPage() {
       setNewZalo("");
       setRefreshKey((k) => k + 1);
     } catch (err: unknown) {
-      setCreateError(err instanceof Error ? err.message : "Tạo hội viên thất bại.");
+      setCreateError(err instanceof Error ? err.message : t.membersDirectory.createError);
     } finally {
       setCreateLoading(false);
     }
@@ -113,14 +115,14 @@ export default function MembersDirectoryPage() {
     e.preventDefault();
     if (!selectedMember) return;
     if (password.length < 8) {
-      setPasswordError("Mật khẩu phải từ 8 ký tự trở lên.");
+      setPasswordError(t.membersDirectory.errPasswordMin);
       return;
     }
     setPasswordError(null);
     setPasswordLoading(true);
     try {
       await api.setMemberLogin(selectedMember.id, password);
-      setPasswordSuccess(`Đã cấp mật khẩu đăng nhập thành công cho ${selectedMember.fullName}!`);
+      setPasswordSuccess(t.membersDirectory.passwordSuccess(selectedMember.fullName));
       setTimeout(() => {
         setShowPasswordModal(false);
         setPasswordSuccess(null);
@@ -128,7 +130,7 @@ export default function MembersDirectoryPage() {
         setRefreshKey((k) => k + 1);
       }, 1500);
     } catch (err: unknown) {
-      setPasswordError(err instanceof Error ? err.message : "Cấp mật khẩu thất bại.");
+      setPasswordError(err instanceof Error ? err.message : t.membersDirectory.passwordError);
     } finally {
       setPasswordLoading(false);
     }
@@ -140,10 +142,10 @@ export default function MembersDirectoryPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-8 border-b border-zinc-200 dark:border-zinc-800">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-            Danh Sách Hội Viên
+            {t.membersDirectory.title}
           </h1>
           <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            Quản lý hồ sơ hội viên tham gia và phân quyền đăng nhập Cổng Hội Viên
+            {t.membersDirectory.subtitle}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -151,14 +153,14 @@ export default function MembersDirectoryPage() {
             href="/host"
             className="rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-xs font-semibold text-zinc-700 shadow-sm hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 transition-colors"
           >
-            ← Về Bảng điều khiển
+            {t.membersDirectory.backToDashboard}
           </Link>
           <button
             onClick={() => setShowCreateModal(true)}
             className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-semibold text-white shadow-md shadow-emerald-600/20 hover:bg-emerald-500 transition-colors cursor-pointer"
           >
             <PlusCircle className="h-4 w-4" />
-            Thêm hội viên mới
+            {t.membersDirectory.addMemberBtn}
           </button>
         </div>
       </div>
@@ -171,12 +173,14 @@ export default function MembersDirectoryPage() {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Tìm theo tên hoặc số điện thoại..."
+            placeholder={t.membersDirectory.searchPlaceholder}
             className="w-full rounded-xl border border-zinc-200 bg-white py-2 pl-10 pr-4 text-sm text-zinc-900 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100"
           />
         </form>
         <span className="text-xs text-zinc-500 dark:text-zinc-400">
-          Tổng số: <strong className="text-zinc-900 dark:text-zinc-100">{members.length}</strong> hội viên
+          {t.membersDirectory.totalCountPrefix}{" "}
+          <strong className="text-zinc-900 dark:text-zinc-100">{members.length}</strong>{" "}
+          {t.membersDirectory.totalCountSuffix}
         </span>
       </div>
 
@@ -195,13 +199,13 @@ export default function MembersDirectoryPage() {
         ) : members.length === 0 ? (
           <EmptyState
             icon={Users}
-            title={query ? "Không tìm thấy hội viên phù hợp" : "Chưa có hội viên nào trong danh bạ"}
+            title={query ? t.membersDirectory.emptySearchTitle : t.membersDirectory.emptyTitle}
             description={
               query
-                ? `Không có kết quả nào khớp với "${query}". Hãy thử từ khóa khác.`
-                : "Thêm hồ sơ hội viên để gán chân vào các dây hụi và cấp quyền đăng nhập xem sao kê."
+                ? t.membersDirectory.emptySearchDesc(query)
+                : t.membersDirectory.emptyDesc
             }
-            actionText={query ? undefined : "Thêm hội viên đầu tiên"}
+            actionText={query ? undefined : t.membersDirectory.emptyAction}
             onAction={query ? undefined : () => setShowCreateModal(true)}
           />
         ) : (
@@ -209,13 +213,13 @@ export default function MembersDirectoryPage() {
             <table className="w-full text-left text-sm">
               <thead className="border-b border-zinc-200/80 bg-zinc-50/70 text-xs font-semibold text-zinc-600 dark:border-zinc-800 dark:bg-zinc-800/40 dark:text-zinc-300">
                 <tr>
-                  <th className="py-3.5 pl-6 pr-3">Họ và tên</th>
-                  <th className="px-3 py-3.5">Số điện thoại</th>
-                  <th className="px-3 py-3.5">CCCD / CMND</th>
-                  <th className="px-3 py-3.5">Zalo</th>
-                  <th className="px-3 py-3.5">Cổng đăng nhập</th>
-                  <th className="px-3 py-3.5">Ngày tạo</th>
-                  <th className="py-3.5 pl-3 pr-6 text-right">Thao tác</th>
+                  <th className="py-3.5 pl-6 pr-3">{t.membersDirectory.colFullName}</th>
+                  <th className="px-3 py-3.5">{t.membersDirectory.colPhone}</th>
+                  <th className="px-3 py-3.5">{t.membersDirectory.colIdCard}</th>
+                  <th className="px-3 py-3.5">{t.membersDirectory.colZalo}</th>
+                  <th className="px-3 py-3.5">{t.membersDirectory.colLoginStatus}</th>
+                  <th className="px-3 py-3.5">{t.membersDirectory.colCreatedAt}</th>
+                  <th className="py-3.5 pl-3 pr-6 text-right">{t.membersDirectory.colActions}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60 text-zinc-700 dark:text-zinc-300">
@@ -237,16 +241,16 @@ export default function MembersDirectoryPage() {
                       {m.loginEnabled ? (
                         <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
                           <CheckCircle2 className="h-3 w-3" />
-                          Đã kích hoạt
+                          {t.membersDirectory.statusActivated}
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-0.5 text-xs font-medium text-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400">
-                          Chưa cấp MK
+                          {t.membersDirectory.statusNoPassword}
                         </span>
                       )}
                     </td>
                     <td className="px-3 py-4 text-xs text-zinc-500">
-                      {formatDate(m.createdAt)}
+                      {formatDate(m.createdAt, language)}
                     </td>
                     <td className="py-4 pl-3 pr-6 text-right">
                       <button
@@ -260,7 +264,9 @@ export default function MembersDirectoryPage() {
                         className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
                       >
                         <KeyRound className="h-3.5 w-3.5 text-emerald-600" />
-                        {m.loginEnabled ? "Đổi mật khẩu" : "Cấp mật khẩu"}
+                        {m.loginEnabled
+                          ? t.membersDirectory.changePasswordBtn
+                          : t.membersDirectory.setPasswordBtn}
                       </button>
                     </td>
                   </tr>
@@ -277,7 +283,7 @@ export default function MembersDirectoryPage() {
           <div className="w-full max-w-md rounded-3xl border border-zinc-200 bg-white p-6 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900">
             <div className="flex items-center justify-between pb-4 border-b border-zinc-200 dark:border-zinc-800">
               <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-50">
-                Thêm Hội Viên Mới
+                {t.membersDirectory.createModalTitle}
               </h3>
               <button
                 onClick={() => setShowCreateModal(false)}
@@ -297,7 +303,7 @@ export default function MembersDirectoryPage() {
             <form onSubmit={handleCreateMember} className="mt-4 space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                  Họ và tên *
+                  {t.membersDirectory.fullNameLabel}
                 </label>
                 <div className="relative mt-1">
                   <User className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
@@ -306,7 +312,7 @@ export default function MembersDirectoryPage() {
                     required
                     value={newFullName}
                     onChange={(e) => setNewFullName(e.target.value)}
-                    placeholder="Nguyễn Văn B"
+                    placeholder={t.membersDirectory.fullNamePlaceholder}
                     className="w-full rounded-xl border border-zinc-200 bg-zinc-50/50 py-2 pl-9 pr-3 text-sm text-zinc-900 outline-none focus:border-emerald-500 focus:bg-white dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-100"
                   />
                 </div>
@@ -314,7 +320,7 @@ export default function MembersDirectoryPage() {
 
               <div>
                 <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                  Số điện thoại *
+                  {t.membersDirectory.phoneLabel}
                 </label>
                 <div className="relative mt-1">
                   <Phone className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
@@ -323,7 +329,7 @@ export default function MembersDirectoryPage() {
                     required
                     value={newPhone}
                     onChange={(e) => setNewPhone(e.target.value)}
-                    placeholder="0911222333"
+                    placeholder={t.membersDirectory.phonePlaceholder}
                     className="w-full rounded-xl border border-zinc-200 bg-zinc-50/50 py-2 pl-9 pr-3 text-sm text-zinc-900 outline-none focus:border-emerald-500 focus:bg-white dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-100"
                   />
                 </div>
@@ -331,7 +337,7 @@ export default function MembersDirectoryPage() {
 
               <div>
                 <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                  Số CCCD / CMND (tùy chọn)
+                  {t.membersDirectory.idCardLabel}
                 </label>
                 <div className="relative mt-1">
                   <CreditCard className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
@@ -339,7 +345,7 @@ export default function MembersDirectoryPage() {
                     type="text"
                     value={newCccd}
                     onChange={(e) => setNewCccd(e.target.value)}
-                    placeholder="079..."
+                    placeholder={t.membersDirectory.idCardPlaceholder}
                     className="w-full rounded-xl border border-zinc-200 bg-zinc-50/50 py-2 pl-9 pr-3 text-sm text-zinc-900 outline-none focus:border-emerald-500 focus:bg-white dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-100"
                   />
                 </div>
@@ -347,7 +353,7 @@ export default function MembersDirectoryPage() {
 
               <div>
                 <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                  Số Zalo (tùy chọn)
+                  {t.membersDirectory.zaloLabel}
                 </label>
                 <div className="relative mt-1">
                   <MessageSquare className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
@@ -355,7 +361,7 @@ export default function MembersDirectoryPage() {
                     type="text"
                     value={newZalo}
                     onChange={(e) => setNewZalo(e.target.value)}
-                    placeholder="0911..."
+                    placeholder={t.membersDirectory.zaloPlaceholder}
                     className="w-full rounded-xl border border-zinc-200 bg-zinc-50/50 py-2 pl-9 pr-3 text-sm text-zinc-900 outline-none focus:border-emerald-500 focus:bg-white dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-100"
                   />
                 </div>
@@ -367,14 +373,14 @@ export default function MembersDirectoryPage() {
                   onClick={() => setShowCreateModal(false)}
                   className="rounded-xl px-4 py-2 text-xs font-semibold text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
                 >
-                  Hủy
+                  {t.membersDirectory.cancelBtn}
                 </button>
                 <button
                   type="submit"
                   disabled={createLoading}
                   className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
                 >
-                  {createLoading ? "Đang tạo..." : "Lưu hội viên"}
+                  {createLoading ? t.membersDirectory.savingBtn : t.membersDirectory.saveMemberBtn}
                 </button>
               </div>
             </form>
@@ -389,7 +395,7 @@ export default function MembersDirectoryPage() {
             <div className="flex items-center justify-between pb-4 border-b border-zinc-200 dark:border-zinc-800">
               <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-50 flex items-center gap-2">
                 <KeyRound className="h-4 w-4 text-emerald-600" />
-                Cấp Mật Khẩu Đăng Nhập
+                {t.membersDirectory.passwordModalTitle}
               </h3>
               <button
                 onClick={() => setShowPasswordModal(false)}
@@ -400,8 +406,10 @@ export default function MembersDirectoryPage() {
             </div>
 
             <p className="mt-3 text-xs text-zinc-600 dark:text-zinc-400">
-              Cấp tài khoản cho hội viên: <strong>{selectedMember.fullName}</strong> ({formatPhone(selectedMember.phone)}).
-              Hội viên sẽ dùng số điện thoại này và mật khẩu bên dưới để đăng nhập vào Cổng Hội Viên.
+              {t.membersDirectory.passwordModalDesc(
+                selectedMember.fullName,
+                formatPhone(selectedMember.phone)
+              )}
             </p>
 
             {passwordError && (
@@ -421,14 +429,14 @@ export default function MembersDirectoryPage() {
             <form onSubmit={handleSetPassword} className="mt-4 space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                  Mật khẩu mới (tối thiểu 8 ký tự)
+                  {t.membersDirectory.newPasswordLabel}
                 </label>
                 <input
                   type="password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Nhập mật khẩu cho hội viên..."
+                  placeholder={t.membersDirectory.newPasswordPlaceholder}
                   className="mt-1 w-full rounded-xl border border-zinc-200 bg-zinc-50/50 py-2.5 px-3.5 text-sm text-zinc-900 outline-none focus:border-emerald-500 focus:bg-white dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-100"
                 />
               </div>
@@ -439,14 +447,16 @@ export default function MembersDirectoryPage() {
                   onClick={() => setShowPasswordModal(false)}
                   className="rounded-xl px-4 py-2 text-xs font-semibold text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
                 >
-                  Hủy
+                  {t.membersDirectory.cancelBtn}
                 </button>
                 <button
                   type="submit"
                   disabled={passwordLoading}
                   className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
                 >
-                  {passwordLoading ? "Đang xử lý..." : "Xác nhận cấp mật khẩu"}
+                  {passwordLoading
+                    ? t.membersDirectory.processingBtn
+                    : t.membersDirectory.confirmPasswordBtn}
                 </button>
               </div>
             </form>
