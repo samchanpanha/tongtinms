@@ -95,7 +95,7 @@ export default function LoginPage() {
               onClick={fillDemoAdmin}
               className="rounded-lg border border-indigo-300/80 bg-white px-2 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 dark:border-indigo-800 dark:bg-zinc-800 dark:text-indigo-300 transition-colors text-center cursor-pointer"
             >
-              Admin Quản Trị
+              {t.login.demoAdmin}
             </button>
           </div>
         </div>

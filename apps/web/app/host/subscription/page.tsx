@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { useLanguage } from "@/lib/i18n";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, formatDate, formatDateTime } from "@/lib/format";
 import {
   CreditCard,
   CheckCircle2,
@@ -102,7 +102,7 @@ interface PayWayCheckoutData {
 }
 
 export default function HostSubscriptionPage() {
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
 
   const [status, setStatus] = useState<SubscriptionStatus | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -199,7 +199,7 @@ export default function HostSubscriptionPage() {
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
             <Sparkles className="h-4 w-4" />
-            <span>Chủ Hụi SaaS / ROSCA Host Subscription</span>
+            <span>{t.subscription.headerEyebrow}</span>
           </div>
           <h1 className="mt-1 text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
             {t.subscription.title}
@@ -215,7 +215,7 @@ export default function HostSubscriptionPage() {
           className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-xs font-semibold text-zinc-700 shadow-sm hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 cursor-pointer"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-          <span>Làm mới</span>
+          <span>{t.subscription.refreshBtn}</span>
         </button>
       </div>
 
@@ -269,7 +269,7 @@ export default function HostSubscriptionPage() {
               </div>
 
               <h2 className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-zinc-50">
-                {status.currentPlan ? status.currentPlan.name : "Gói Dùng Thử Miễn Phí (1 Tháng)"}
+                {status.currentPlan ? status.currentPlan.name : t.subscription.trialPlanName}
               </h2>
 
               <p className="text-sm text-zinc-600 dark:text-zinc-300 max-w-2xl">
@@ -277,28 +277,27 @@ export default function HostSubscriptionPage() {
                 {status.isExpired && t.subscription.expiredWarning}
                 {status.isGracePeriod && t.subscription.graceWarning}
                 {status.subscriptionStatus === "ACTIVE" &&
-                  `Gói của bạn đang hoạt động bình thường đến ngày ${new Date(status.subscriptionEndsAt).toLocaleDateString()}.`}
-                {status.subscriptionStatus === "LIFETIME" &&
-                  "Tài khoản của bạn đã được kích hoạt quyền quản trị Chủ Hụi VIP Vĩnh Viễn."}
+                  t.subscription.activeUntil(formatDate(status.subscriptionEndsAt, language))}
+                {status.subscriptionStatus === "LIFETIME" && t.subscription.lifetimeActiveMsg}
               </p>
             </div>
 
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 bg-white/80 dark:bg-zinc-800/80 p-4 rounded-2xl border border-zinc-200/80 dark:border-zinc-700/80">
               <div className="space-y-1">
-                <div className="text-xs text-zinc-500 dark:text-zinc-400">Thời hạn sử dụng</div>
+                <div className="text-xs text-zinc-500 dark:text-zinc-400">{t.subscription.validityLabel}</div>
                 <div className="text-lg font-bold text-zinc-900 dark:text-zinc-50 flex items-center gap-1.5">
                   <Clock className="h-4 w-4 text-emerald-600" />
                   {t.subscription.daysRemaining(status.daysRemaining)}
                 </div>
                 <div className="text-[11px] text-zinc-400">
-                  Hết hạn: {new Date(status.subscriptionEndsAt).toLocaleDateString()}
+                  {t.subscription.expiresOn(formatDate(status.subscriptionEndsAt, language))}
                 </div>
               </div>
 
               <div className="hidden sm:block h-10 w-px bg-zinc-200 dark:bg-zinc-700" />
 
               <div className="space-y-1">
-                <div className="text-xs text-zinc-500 dark:text-zinc-400">Hạn mức sử dụng</div>
+                <div className="text-xs text-zinc-500 dark:text-zinc-400">{t.subscription.quotaLabel}</div>
                 <div className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">
                   {t.subscription.usageGroups(
                     status.groupsCount,
@@ -360,7 +359,7 @@ export default function HostSubscriptionPage() {
                       {plan.name}
                     </h3>
                     <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400 min-h-[32px]">
-                      {plan.description || "Gói dịch vụ cao cấp"}
+                      {plan.description || t.subscription.defaultPlanDesc}
                     </p>
                   </div>
 
@@ -375,7 +374,7 @@ export default function HostSubscriptionPage() {
 
                   <div className="space-y-2.5 pt-2">
                     <div className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
-                      Quyền lợi bao gồm:
+                      {t.subscription.benefitsLabel}
                     </div>
                     <ul className="space-y-2">
                       {features.map((feat, idx) => (
@@ -427,7 +426,7 @@ export default function HostSubscriptionPage() {
                 <tr>
                   <th className="px-4 py-3">{t.subscription.colTranId}</th>
                   <th className="px-4 py-3">{t.subscription.colAmount}</th>
-                  <th className="px-4 py-3">Cổng thanh toán</th>
+                  <th className="px-4 py-3">{t.subscription.gatewayCol}</th>
                   <th className="px-4 py-3">{t.subscription.colStatus}</th>
                   <th className="px-4 py-3">{t.subscription.colDate}</th>
                 </tr>
@@ -458,9 +457,7 @@ export default function HostSubscriptionPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-zinc-500">
-                      {inv.paidAt
-                        ? new Date(inv.paidAt).toLocaleString()
-                        : new Date(inv.createdAt).toLocaleString()}
+                      {formatDateTime(inv.paidAt ?? inv.createdAt, language)}
                     </td>
                   </tr>
                 ))}
@@ -524,7 +521,7 @@ export default function HostSubscriptionPage() {
                     }}
                     className="rounded-xl bg-emerald-600 px-6 py-2.5 text-xs font-semibold text-white shadow-md hover:bg-emerald-500 cursor-pointer"
                   >
-                    Hoàn tất & Quay lại
+                    {t.subscription.completeAndBackBtn}
                   </button>
                 </div>
               ) : (
@@ -532,17 +529,17 @@ export default function HostSubscriptionPage() {
                   {/* Order Summary */}
                   <div className="rounded-2xl border border-zinc-200/80 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-800/40 space-y-2">
                     <div className="flex justify-between text-xs">
-                      <span className="text-zinc-500">Gói đăng ký:</span>
+                      <span className="text-zinc-500">{t.subscription.planLabel}</span>
                       <span className="font-bold text-zinc-900 dark:text-zinc-100">{selectedPlan.name}</span>
                     </div>
                     <div className="flex justify-between text-xs">
-                      <span className="text-zinc-500">Mã giao dịch (Tran ID):</span>
+                      <span className="text-zinc-500">{t.subscription.tranIdLabel}</span>
                       <span className="font-mono font-semibold text-zinc-700 dark:text-zinc-300">
                         {checkoutData?.tranId}
                       </span>
                     </div>
                     <div className="flex justify-between text-xs border-t border-zinc-200/60 pt-2 dark:border-zinc-700/60">
-                      <span className="font-semibold text-zinc-700 dark:text-zinc-300">Tổng thanh toán:</span>
+                      <span className="font-semibold text-zinc-700 dark:text-zinc-300">{t.subscription.totalLabel}</span>
                       <span className="text-base font-extrabold text-emerald-600 dark:text-emerald-400">
                         {formatMoney(selectedPlan.priceMinor, selectedPlan.currency)}
                       </span>
@@ -579,7 +576,7 @@ export default function HostSubscriptionPage() {
                       className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-xs font-bold text-white shadow-md shadow-emerald-600/20 hover:bg-emerald-500 disabled:opacity-50 transition-all cursor-pointer"
                     >
                       <Zap className="h-4 w-4" />
-                      <span>{isSimulating ? "Đang xử lý..." : t.subscription.simulateFastPay}</span>
+                      <span>{isSimulating ? t.subscription.processing : t.subscription.simulateFastPay}</span>
                     </button>
 
                     {checkoutData && (

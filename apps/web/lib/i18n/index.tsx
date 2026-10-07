@@ -73,11 +73,21 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (typeof document !== "undefined") {
-      const opt = LANGUAGE_OPTIONS.find((o) => o.code === language) || LANGUAGE_OPTIONS[0];
-      document.documentElement.lang = opt.htmlLang;
-      document.title = TRANSLATIONS[language].meta.title;
-    }
+    if (typeof document === "undefined") return;
+    const opt = LANGUAGE_OPTIONS.find((o) => o.code === language) || LANGUAGE_OPTIONS[0];
+    const title = TRANSLATIONS[language].meta.title;
+    document.documentElement.lang = opt.htmlLang;
+    document.title = title;
+
+    // Next.js re-applies the static root metadata title on hydration and route
+    // changes; re-assert the language-specific title whenever that happens.
+    const observer = new MutationObserver(() => {
+      if (document.title !== title) {
+        document.title = title;
+      }
+    });
+    observer.observe(document.head, { childList: true, subtree: true, characterData: true });
+    return () => observer.disconnect();
   }, [language]);
 
   const setLanguage = useCallback((lang: Language) => {

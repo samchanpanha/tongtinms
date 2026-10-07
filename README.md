@@ -39,7 +39,7 @@ tongtin/
 │       ├── components/          # StatCard, StatusBadge, EmptyState, Navbar, v.v.
 │       └── lib/                 # Client API wrapper, formatMoney (1.000.000 đ), định dạng ngày
 │
-├── docker-compose.yml           # PostgreSQL 16 Database
+├── docker-compose.yml           # Triển khai Docker: PostgreSQL 16 + Backend API + Frontend Web
 ├── start.sh                     # Kịch bản khởi động toàn bộ một lệnh (All-in-one startup)
 └── docs/                        # Tài liệu đặc tả kỹ thuật toàn diện
 ```
@@ -101,6 +101,33 @@ Kịch bản sẽ tự động:
 ./start.sh --web-only   # Chỉ khởi động Frontend Web (cổng 3000)
 ./start.sh --help       # Xem hướng dẫn tùy chọn
 ```
+
+### Triển Khai Toàn Bộ Bằng Docker (Backend + Frontend + Database)
+
+Không cần cài Java/Node trên máy — chỉ cần Docker. Toàn bộ hệ thống (PostgreSQL 16, API Spring Boot, giao diện Next.js) được đóng gói và chạy bằng một lệnh:
+
+```bash
+# (Tùy chọn) Sao chép cấu hình môi trường và chỉnh sửa
+cp .env.example .env
+
+# Build và khởi động toàn bộ stack (lần đầu mất vài phút để build image)
+docker compose up --build -d
+
+# Xem trạng thái / log
+docker compose ps
+docker compose logs -f api
+
+# Dừng toàn bộ
+docker compose down
+```
+
+- **API Spring Boot** chạy tại `http://localhost:8080` — tự động áp dụng Flyway migration khi khởi động, healthcheck tại `/api/v1/health`.
+- **Giao diện Next.js** chạy tại `http://localhost:3000` — tự động proxy `/api/*` sang container API qua build arg `API_INTERNAL_URL` (mặc định `http://api:8080`).
+- **Dữ liệu mẫu**: đặt `APP_SEED_DEMO=true` trong `.env` trước khi chạy để nạp bộ demo N=10 chuẩn (`./start.sh --seed` bản Docker).
+- **Bảo mật**: đổi `JWT_SECRET` trong `.env` trước khi triển khai thật.
+- `./start.sh` vẫn là quy trình phát triển (hot reload); Docker Compose là quy trình triển khai (image cố định, có healthcheck và tự khởi động lại).
+
+> Lưu ý: `API_INTERNAL_URL` được Next.js đóng băng vào web image lúc build (rewrites). Nếu đổi URL API, cần chạy lại `docker compose build web`.
 
 ---
 

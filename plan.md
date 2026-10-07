@@ -30,10 +30,11 @@
 | 17 | Preview polish | ✅ DONE (2026-10-07) — Vietnamese UI copy first (1.000.000 đ), modern web UX & dark mode, host & member portal routes, preview allowedOrigins, all-in-one start.sh, npm run build (11/11 routes) & lint 0 errors, 119 tests pass |
 | 18 | Final delivery & wrap-up | ✅ DONE (2026-10-07) — End-to-end verification (10/10 checks pass), audit trail verified, comprehensive README, all-in-one start.sh --seed, 119 tests pass |
 | 20 | Centralized settings module | ✅ DONE (2026-10-07) — catalog-driven `SettingsService` + `/api/v1/admin/settings` + admin UI (4 categories / 15 keys), 8 consumers rewired, `AdminSettingsTests` → 141 tests pass (see §8) |
+| 21 | Docker deployment (full stack) | ✅ DONE (2026-10-07) — multi-stage Dockerfiles (api + web), Docker Compose with postgres/api/web + healthcheck-gated startup, Next.js standalone build, `.env.example`; 3 containers healthy, health UP direct + via proxy, login e2e 200 (see §9) |
 
-**Overall phase:** `completed` — planning 100%, code **18/18 steps done (100% COMPLETE)** + Step 19 subscriptions layer (see §7) + Step 20 centralized settings module (see §8).
+**Overall phase:** `completed` — planning 100%, code **18/18 steps done (100% COMPLETE)** + Step 19 subscriptions layer (see §7) + Step 20 centralized settings module (see §8) + Step 21 full-stack Docker deployment (see §9) + full 4-locale i18n pass (see §10).
 **Blockers:** none.
-**Next action:** Post-delivery audit completed 2026-10-07 (§7); centralized settings module delivered 2026-10-07 (§8). Next candidates in §7.5.
+**Next action:** Full i18n pass delivered 2026-10-07 (§10); web Docker image rebuilt so the running stack serves it. Next candidates in §7.5.
 
 ### Easy follow steps (how to run every session)
 
@@ -464,4 +465,87 @@ Next candidates (user picks, then doc-gate per session rules):
 - `mvn test` — **141 tests, 0 failures** (132 + 9). Frontend: `tsc --noEmit`, `eslint`, `npm run build` all clean.
 - Note: the live browser pass over the rewritten admin tab was **not** run this session (dev servers were blocked by the session's permission mode); UI correctness rests on build/typecheck plus the API-contract tests. A dev admin was seeded in the local dev DB (`0988999999`) for that follow-up check.
 - `plan.md` §7.5 roadmap otherwise unaffected; item 5 (admin insights) gains its settings foundation.
+
+---
+
+## 9. Full-stack Docker deployment (Step 21, 2026-10-07)
+
+> Requested: *"Help me implement deploy all backend and frontend with docker."* Before this step
+> `docker-compose.yml` started **only** PostgreSQL; the API and web ran on the host via
+> `start.sh`. Step 21 containerizes the entire stack so a single `docker compose up --build -d`
+> brings up database + API + frontend, locally or on a server.
+
+### 9.1 Implementation
+
+- **`apps/api/Dockerfile`** — multi-stage: `maven:3.9-eclipse-temurin-21` build (`dependency:go-offline` layer cached on `pom.xml`, then `-DskipTests package`) → `eclipse-temurin:21-jre-alpine` runtime, non-root `spring` user, `JAVA_OPTS` entrypoint, `HEALTHCHECK` on `/api/v1/health` (start-period 90s).
+- **`apps/web/Dockerfile`** — three stages on `node:22-alpine` (`deps` npm ci → `build` → `runtime`). Runtime copies `.next/standalone`, `.next/static`, `public`; non-root `node` user; `HEALTHCHECK` on `/login`.
+- **`apps/web/next.config.ts`** — `output: "standalone"` only when `NEXT_STANDALONE=1`, so local `next dev` / `next start` are unchanged.
+- **`docker-compose.yml`** — three services: `postgres` (named volume `tongtin_pgdata`, preserves existing dev data), `api` (env-driven DB config already supported by `application.yml`), `web`; startup order enforced by healthcheck-gated `depends_on` (`postgres → api → web`); `restart: unless-stopped`.
+- **API internal URL** — Next.js rewrites are baked at **build time**, so the web image receives `API_INTERNAL_URL` (default `http://api:8080`) as a build ARG; both Dockerfiles/`.dockerignore` keep images lean.
+- **Seeding** — compose passes `-Dapp.seed-demo=${APP_SEED_DEMO:-false}` via `JAVA_OPTS` (system property, not relaxed binding); a normal `docker compose up` never seeds demo data, demo mode is opt-in.
+- **`.env.example`** — documents `JWT_SECRET` (must be changed for real deployment), `APP_SEED_DEMO`, `API_INTERNAL_URL` (rebuild web after changing). README gained a "Triển Khai Toàn Bộ Bằng Docker" section (in Vietnamese, per UI-language convention).
+
+### 9.2 Verification (all green)
+
+- `docker compose config -q` valid; both images build (api repackaged `tongtin-api-0.0.1-SNAPSHOT.jar`, web 332 MB).
+- `docker compose up -d --wait` — all three containers `(healthy)`.
+- API direct `http://localhost:8080/api/v1/health` → `{"status":"UP"}`; via web proxy `http://localhost:3000/api/v1/health` → `{"status":"UP"}`.
+- Login e2e through the proxy: `POST http://localhost:3000/api/v1/auth/login` (`0900111001` / `demo1234`) → **HTTP 200** with user + owner JSON — proves browser → web → api → postgres chain.
+- API logs: Flyway connected `jdbc:postgresql://postgres:5432/tongtin (PostgreSQL 16.15)`, `Started TongTinApplication in 3.777 seconds`; no seeder logs (off by default).
+- `npx tsc --noEmit` clean. Local dev flow unaffected (`start.sh` still runs compose postgres + host dev servers).
+- Note: the in-browser click-through was deferred (browser click blocked by the session permission classifier); UI correctness rests on HTTP checks above plus the existing 141-test API suite.
+- Nothing committed — per standing rule ("Do not commit … unless the user says so"). Stack left running at the end of the session; stop with `docker compose down`.
+
+---
+
+## 10. Full 4-locale i18n pass + live verification (2026-10-07)
+
+> Requested: *"help me fix errors and issues and switch languages some not translate."*
+> Audit of every user-facing string across the App Router pages found untranslated /
+> hardcoded text, plus one real client-side defect (page title reverting to the default
+> language). All fixed and verified live in **km (default), en, zh, vi**. No backend,
+> domain or API change — doc gate not triggered. Nothing committed.
+
+### 10.1 Untranslated strings fixed
+
+- Host & admin surfaces: hero/dashboard copy, KPI cards, group tables, empty states,
+  auth error messages, notifications page, landing page hero + feature cards.
+- `apps/web/app/host/subscription/page.tsx` — full subscription/checkout/plan UI translated.
+- `apps/web/app/admin/page.tsx` — settings tab labels for the Step 20 catalog plus the
+  Plans and Hosts tabs (headers, edit/delete, extend modal, lifetime option, day/group counts).
+- **Backend label override (frontend-only):** Step 20's `SettingsCatalog` labels/descriptions
+  are hardcoded Vietnamese; translated via `t.admin.settingCategories / settingLabels /
+  settingDescriptions` maps with `?? apiValue` fallback — no API change, no new keys.
+- Kept as data (intentional, not UI strings): subscription plan names/descriptions/features
+  from the `subscription_plans` table, raw status enums in short badges, demo group name.
+
+### 10.2 Document-title defect fixed
+
+- Symptom: after switching language and reloading (or navigating), the `<title>` reverted
+  to the Khmer default while `htmlLang` and content stayed correct.
+- Root cause: Next.js re-applies the static root `export const metadata` title
+  (`app/layout.tsx`) on hydration and client-side route changes, overwriting the
+  language-aware title set by `LanguageProvider`.
+- Fix (`lib/i18n/index.tsx`): a `MutationObserver` on `<head>` re-asserts
+  `document.title = t.meta.title` whenever the framework overwrites it; also keeps
+  `document.documentElement.lang` in sync. Cleaned up on language change/unmount.
+
+### 10.3 Verification (live, production build)
+
+- Production build `npm run build` (13/13 routes); served on `localhost:3001` against the
+  dev API; exercised with the browser tooling.
+- Content spot-checks per locale: landing (km/en/vi/zh), host dashboard (km/en),
+  host subscription (all 4), notifications (vi/zh), admin settings + Plans + Hosts tabs
+  and the extend modal (km/en), member flows (km).
+- Title regression: switch to vi → reload → title stays Vietnamese; client-nav → stays vi.
+  Switch to zh → reload → title stays Chinese; client-nav to `/notifications` → stays zh.
+  (`htmlLang` zh-CN, h1 系统通知 — all correct.)
+- Date/money formatting code verified correct for all 4 `dateLocale`s; in headless Chromium
+  the km-KH ICU data is missing (falls back to en-US ordering) — environment artifact,
+  full-ICU runtimes (Node, real browsers) render km dates correctly. Not an app bug.
+- `tsc --noEmit`, `eslint`, `npm run build` all clean after the fixes.
+- Web Docker image rebuilt (`docker compose build web && up -d web`) so the deployed
+  stack at `http://localhost:3000` now serves the fixes; container healthy, health proxy
+  UP, zh chunk present in the baked image.
+
 

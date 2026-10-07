@@ -2,6 +2,7 @@ services:
   postgres:
     image: postgres:16
     container_name: tongtin-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_DB: tongtin
       POSTGRES_USER: tongtin
@@ -15,6 +16,40 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  api:
+    build:
+      context: ./apps/api
+    image: tongtin-api
+    container_name: tongtin-api
+    restart: unless-stopped
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/tongtin
+      DB_USER: tongtin
+      DB_PASSWORD: tongtin
+      JWT_SECRET: ${JWT_SECRET:-tongtin-dev-secret-key-change-me-in-production-0123456789abcdef}
+      JAVA_OPTS: "-XX:MaxRAMPercentage=75.0 -Dapp.seed-demo=${APP_SEED_DEMO:-false}"
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ./apps/web
+      args:
+        API_INTERNAL_URL: ${API_INTERNAL_URL:-http://api:8080}
+    image: tongtin-web
+    container_name: tongtin-web
+    restart: unless-stopped
+    environment:
+      API_INTERNAL_URL: ${API_INTERNAL_URL:-http://api:8080}
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
 
 volumes:
   tongtin_pgdata:

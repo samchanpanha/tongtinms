@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { api, AdminSetting, AdminSettingsView } from "@/lib/api";
 import { useLanguage } from "@/lib/i18n";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, formatDateTime } from "@/lib/format";
 import {
   Shield,
   Settings,
@@ -80,7 +80,7 @@ interface Order {
 }
 
 export default function AdminPage() {
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
   const [activeTab, setActiveTab] = useState<"settings" | "plans" | "hosts" | "orders">("settings");
 
   const [settingsView, setSettingsView] = useState<AdminSettingsView | null>(null);
@@ -127,7 +127,7 @@ export default function AdminPage() {
       })
       .catch((err: unknown) => {
         if (!ignore) {
-          setError(err instanceof Error ? err.message : "Access denied. Admin role required.");
+          setError(err instanceof Error ? err.message : t.admin.errLoadData);
           setLoading(false);
         }
       });
@@ -135,7 +135,7 @@ export default function AdminPage() {
     return () => {
       ignore = true;
     };
-  }, [refreshKey]);
+  }, [refreshKey, t]);
 
   const loadAll = () => {
     setLoading(true);
@@ -167,7 +167,7 @@ export default function AdminPage() {
       setSuccessMsg(t.admin.settingsSavedSuccess);
       setTimeout(() => setSuccessMsg(null), 3000);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to save settings");
+      setError(err instanceof Error ? err.message : t.admin.errSaveSettings);
     } finally {
       setSavingCategory(null);
     }
@@ -186,17 +186,17 @@ export default function AdminPage() {
       setEditingPlan(null);
       loadAll();
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "Error saving plan");
+      alert(err instanceof Error ? err.message : t.admin.errSavePlan);
     }
   };
 
   const handleDeletePlan = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this subscription plan?")) return;
+    if (!confirm(t.admin.errDeleteConfirm)) return;
     try {
       await api.deleteAdminPlan(id);
       loadAll();
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "Error deleting plan");
+      alert(err instanceof Error ? err.message : t.admin.errDeletePlan);
     }
   };
 
@@ -212,7 +212,7 @@ export default function AdminPage() {
       setSelectedHost(null);
       loadAll();
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "Error extending subscription");
+      alert(err instanceof Error ? err.message : t.admin.errExtend);
     } finally {
       setIsExtending(false);
     }
@@ -231,7 +231,7 @@ export default function AdminPage() {
             onChange={(e) => setValue(e.target.checked ? "true" : "false")}
             className="h-4 w-4 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"
           />
-          <span>{setting.label}</span>
+          <span>{t.admin.settingLabels[setting.key] ?? setting.label}</span>
         </label>
       );
     }
@@ -239,7 +239,7 @@ export default function AdminPage() {
     return (
       <>
         <label className="flex flex-wrap items-center gap-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-          <span>{setting.label}</span>
+          <span>{t.admin.settingLabels[setting.key] ?? setting.label}</span>
           {setting.type === "SECRET" && setting.configured && (
             <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300">
               {t.admin.configuredBadge}
@@ -275,7 +275,7 @@ export default function AdminPage() {
           className="mt-1.5 w-full rounded-xl border border-zinc-200 bg-zinc-50/50 p-2.5 text-xs font-mono text-zinc-900 outline-none focus:border-indigo-500 focus:bg-white dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-100"
         />
         <p className="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">
-          {setting.description}
+          {t.admin.settingDescriptions[setting.key] ?? setting.description}
           {setting.type === "INT" && setting.min !== null && setting.max !== null
             ? ` (${setting.min}–${setting.max})`
             : ""}
@@ -291,7 +291,7 @@ export default function AdminPage() {
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
             <Shield className="h-4 w-4" />
-            <span>Platform Administration & Gateway Control</span>
+            <span>{t.admin.headerEyebrow}</span>
           </div>
           <h1 className="mt-1 text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
             {t.admin.title}
@@ -307,7 +307,7 @@ export default function AdminPage() {
           className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2 text-xs font-semibold text-zinc-700 shadow-sm hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 cursor-pointer"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-          <span>Reload</span>
+          <span>{t.admin.reloadBtn}</span>
         </button>
       </div>
 
@@ -388,7 +388,7 @@ export default function AdminPage() {
               <div>
                 <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-50 flex items-center gap-2">
                   <Settings className="h-5 w-5 text-indigo-600" />
-                  {category.label}
+                  {t.admin.settingCategories[category.code] ?? category.label}
                 </h2>
               </div>
 
@@ -407,7 +407,7 @@ export default function AdminPage() {
                   className="flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-2.5 text-xs font-semibold text-white shadow-md hover:bg-indigo-500 disabled:opacity-50 transition-all cursor-pointer"
                 >
                   <Save className="h-4 w-4" />
-                  <span>{savingCategory === category.code ? "Saving..." : t.admin.saveSettingsBtn}</span>
+                  <span>{savingCategory === category.code ? t.admin.savingBtn : t.admin.saveSettingsBtn}</span>
                 </button>
               </div>
             </form>
@@ -452,14 +452,14 @@ export default function AdminPage() {
             <table className="w-full text-left text-xs">
               <thead className="border-b border-zinc-200 bg-zinc-50 font-semibold text-zinc-700 dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-300">
                 <tr>
-                  <th className="px-4 py-3">Code</th>
-                  <th className="px-4 py-3">Tên Gói</th>
-                  <th className="px-4 py-3">Giá tiền</th>
-                  <th className="px-4 py-3">Thời hạn</th>
-                  <th className="px-4 py-3">Giới hạn (Dây / Hội viên)</th>
-                  <th className="px-4 py-3">Huy hiệu</th>
-                  <th className="px-4 py-3">Trạng thái</th>
-                  <th className="px-4 py-3 text-right">Thao tác</th>
+                  <th className="px-4 py-3">{t.admin.colCode}</th>
+                  <th className="px-4 py-3">{t.admin.colPlanTitle}</th>
+                  <th className="px-4 py-3">{t.admin.colPrice}</th>
+                  <th className="px-4 py-3">{t.admin.colDuration}</th>
+                  <th className="px-4 py-3">{t.admin.colLimits}</th>
+                  <th className="px-4 py-3">{t.admin.colBadge}</th>
+                  <th className="px-4 py-3">{t.admin.colStatus}</th>
+                  <th className="px-4 py-3 text-right">{t.admin.colActions}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
@@ -470,9 +470,9 @@ export default function AdminPage() {
                     <td className="px-4 py-3 font-bold text-emerald-600 dark:text-emerald-400">
                       {formatMoney(p.priceMinor, p.currency)}
                     </td>
-                    <td className="px-4 py-3">{p.durationMonths} tháng</td>
+                    <td className="px-4 py-3">{t.admin.monthsValue(p.durationMonths)}</td>
                     <td className="px-4 py-3">
-                      {p.maxGroups < 0 ? "Vô hạn" : p.maxGroups} / {p.maxMembers < 0 ? "Vô hạn" : p.maxMembers}
+                      {p.maxGroups < 0 ? t.subscription.unlimited : p.maxGroups} / {p.maxMembers < 0 ? t.subscription.unlimited : p.maxMembers}
                     </td>
                     <td className="px-4 py-3">
                       {p.badge && (
@@ -565,10 +565,10 @@ export default function AdminPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 font-semibold">
-                      {h.subscriptionStatus === "LIFETIME" ? "Vĩnh viễn" : `${h.daysRemaining} ngày`}
+                      {h.subscriptionStatus === "LIFETIME" ? t.admin.lifetimeShort : t.admin.daysValue(h.daysRemaining)}
                     </td>
                     <td className="px-4 py-3 text-zinc-600 dark:text-zinc-300">{h.currentPlanName}</td>
-                    <td className="px-4 py-3">{h.groupsCount} dây</td>
+                    <td className="px-4 py-3">{t.admin.groupsValue(h.groupsCount)}</td>
                     <td className="px-4 py-3 text-right">
                       <button
                         onClick={() => {
@@ -603,7 +603,7 @@ export default function AdminPage() {
               <thead className="border-b border-zinc-200 bg-zinc-50 font-semibold text-zinc-700 dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-300">
                 <tr>
                   <th className="px-4 py-3">{t.subscription.colTranId}</th>
-                  <th className="px-4 py-3">Owner ID</th>
+                  <th className="px-4 py-3">{t.admin.ownerIdCol}</th>
                   <th className="px-4 py-3">{t.subscription.colAmount}</th>
                   <th className="px-4 py-3">{t.admin.colGateway}</th>
                   <th className="px-4 py-3">{t.admin.colGatewayTranId}</th>
@@ -633,7 +633,7 @@ export default function AdminPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-zinc-500">
-                      {o.paidAt ? new Date(o.paidAt).toLocaleString() : new Date(o.createdAt).toLocaleString()}
+                      {formatDateTime(o.paidAt ?? o.createdAt, language)}
                     </td>
                   </tr>
                 ))}
@@ -776,7 +776,7 @@ export default function AdminPage() {
                   onClick={() => setIsPlanModalOpen(false)}
                   className="rounded-xl border border-zinc-200 px-4 py-2 text-xs font-semibold text-zinc-600 hover:bg-zinc-100 dark:border-zinc-800 dark:text-zinc-400"
                 >
-                  Cancel
+                  {t.admin.cancelBtn}
                 </button>
                 <button
                   type="submit"
@@ -805,9 +805,9 @@ export default function AdminPage() {
 
             <div className="mt-4 space-y-4">
               <div className="rounded-xl bg-zinc-50 p-3 text-xs dark:bg-zinc-800">
-                <div>Chủ Hụi: <span className="font-bold">{selectedHost.fullName}</span></div>
-                <div>SĐT: <span className="font-mono">{selectedHost.phone}</span></div>
-                <div>Hiện tại còn: <span className="font-bold text-emerald-600">{selectedHost.daysRemaining} ngày</span></div>
+                <div>{t.admin.hostInfoLabel}: <span className="font-bold">{selectedHost.fullName}</span></div>
+                <div>{t.admin.phoneInfoLabel}: <span className="font-mono">{selectedHost.phone}</span></div>
+                <div>{t.admin.remainingInfoLabel}: <span className="font-bold text-emerald-600">{t.admin.daysValue(selectedHost.daysRemaining)}</span></div>
               </div>
 
               <div>
@@ -827,7 +827,7 @@ export default function AdminPage() {
                           : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300"
                       }`}
                     >
-                      +{d} ngày
+                      {t.admin.extendDaysOption(d)}
                     </button>
                   ))}
                 </div>
@@ -839,7 +839,7 @@ export default function AdminPage() {
                   type="text"
                   value={extendReason}
                   onChange={(e) => setExtendReason(e.target.value)}
-                  placeholder="Gia hạn khuyến mãi / hỗ trợ"
+                  placeholder={t.admin.extendReasonPlaceholder}
                   className="mt-1 w-full rounded-xl border border-zinc-200 bg-zinc-50 p-2.5 text-xs dark:border-zinc-800 dark:bg-zinc-800"
                 />
               </div>
@@ -862,7 +862,7 @@ export default function AdminPage() {
                   onClick={() => setSelectedHost(null)}
                   className="rounded-xl border border-zinc-200 px-4 py-2 text-xs font-semibold text-zinc-600 hover:bg-zinc-100 dark:border-zinc-800 dark:text-zinc-400"
                 >
-                  Cancel
+                  {t.admin.cancelBtn}
                 </button>
                 <button
                   type="button"
@@ -870,7 +870,7 @@ export default function AdminPage() {
                   onClick={handleConfirmExtend}
                   className="rounded-xl bg-indigo-600 px-5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:opacity-50 cursor-pointer"
                 >
-                  {isExtending ? "Đang xử lý..." : t.admin.confirmExtendBtn}
+                  {isExtending ? t.admin.processingBtn : t.admin.confirmExtendBtn}
                 </button>
               </div>
             </div>

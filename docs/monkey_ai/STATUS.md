@@ -1,7 +1,7 @@
 # STATUS
 
-CURRENT_STEP: 20
-CURRENT_STEP_TITLE: Centralized Settings Module (admin-managed configuration for every module)
+CURRENT_STEP: 21
+CURRENT_STEP_TITLE: Full-stack Docker deployment (postgres + api + web via Docker Compose)
 PHASE: completed
 LAST_UPDATED: 2026-10-07
 
@@ -30,6 +30,7 @@ LAST_UPDATED: 2026-10-07
 - [x] Step 18 Final delivery & wrap-up (All 10 e2e checks passed, audit verification, comprehensive README, DB clean, 18/18 steps 100% complete)
 - [x] Step 19 SaaS Subscriptions & ABA PayWay Gateway (Host registration 1-month free trial, ABA PayWay HMAC-SHA512 checkout & KHQR integration per developer.payway.com.kh, admin control panel for gateway configuration and subscription plans, Flyway V11, multilingual support)
 - [x] Step 20 Centralized Settings Module (catalog-driven `com.tongtin.settings`: 15 keys in 4 categories over `system_settings`, ADMIN-only `/api/v1/admin/settings` GET/PUT with per-type validation + SECRET masking + audit, admin UI tab rewritten from the catalog, 8 consumers rewired to read settings live, `AdminSettingsTests` 9 new → 141 tests pass)
+- [x] Step 21 Full-stack Docker deployment (multi-stage `apps/api/Dockerfile` + `apps/web/Dockerfile`, Compose now runs postgres + api + web with healthcheck-gated startup order, Next.js standalone build, `API_INTERNAL_URL` build arg, `.env.example`, opt-in `APP_SEED_DEMO`; 3 containers healthy, health UP direct + proxy, login e2e 200)
 
 ## Step 08 acceptance (2026-10-06)
 
@@ -386,18 +387,65 @@ LAST_UPDATED: 2026-10-07
 - [x] Legacy `GET/PUT /admin/settings/payway` kept (Step 19 tests depend on it)
 - [x] `AdminSettingsTests` (9 new): grouped view 4/4 + masking; anon 401 / host 403 / admin 200 secret-free; 8 × 400 invalid payloads (+1 over HTTP); normalization; grace 5 honored by guard (−4d ok / −6d 403); free_trial 10 → registration expiry; default offset 5 applied on create; reminder day 2 → lifecycle notification; TTL 45 → login `expiresIn` 2700; blank secret unchanged
 - [x] `mvn test`: **141 tests, 0 failures** (132 + 9); frontend `tsc` + `eslint` + `npm run build` clean
-- [ ] Live browser pass over the rewritten admin tab — deferred (dev servers blocked by session permission mode); dev admin seeded in local dev DB (`0988999999`) for the follow-up check
+- [x] Live browser pass over the rewritten admin tab — DONE 2026-10-07 during the i18n verification pass
+      (admin settings tab exercised in km/en/vi/zh on a production build; dev admin `0988999999`)
+
+## Step 21 acceptance (2026-10-07)
+
+- [x] Doc gate: no domain/API change (deployment only); `README.md` gained the Vietnamese "Triển Khai Toàn Bộ Bằng Docker" section; `plan.md` §9 records the step
+- [x] `apps/api/Dockerfile`: multi-stage (maven:3.9-eclipse-temurin-21 build → eclipse-temurin:21-jre-alpine runtime), non-root `spring` user, `JAVA_OPTS` entrypoint, HEALTHCHECK on `/api/v1/health`
+- [x] `apps/web/Dockerfile`: multi-stage (node:22-alpine deps → build → runtime), copies `.next/standalone` + `.next/static` + `public`, non-root `node` user, HEALTHCHECK on `/login`
+- [x] `next.config.ts`: `output: "standalone"` only when `NEXT_STANDALONE=1` — local `next dev` / `next start` unchanged
+- [x] `docker-compose.yml`: postgres (named volume `tongtin_pgdata`, existing dev data preserved) + api (env-driven DB) + web; `depends_on` gated on healthchecks (`postgres → api → web`); `restart: unless-stopped`
+- [x] Next.js rewrites are build-time: web image takes `API_INTERNAL_URL` (default `http://api:8080`) as build ARG — documented in README/.env.example (rebuild required to change)
+- [x] Seeding opt-in: `JAVA_OPTS: -Dapp.seed-demo=${APP_SEED_DEMO:-false}` — plain `docker compose up` never seeds demo data
+- [x] `.dockerignore` for both apps; `.env.example` documents `JWT_SECRET` / `APP_SEED_DEMO` / `API_INTERNAL_URL`
+- [x] Build: both images built clean (`tongtin-api` jar repackaged, `tongtin-web` 332 MB)
+- [x] `docker compose up -d --wait`: all 3 containers `(healthy)`
+- [x] Health: direct `http://localhost:8080/api/v1/health` → UP; via web proxy `http://localhost:3000/api/v1/health` → UP
+- [x] Login e2e via proxy: `POST http://localhost:3000/api/v1/auth/login` (`0900111001`/`demo1234`) → HTTP 200 user+owner JSON (browser → web → api → postgres proven)
+- [x] API logs: Flyway on `jdbc:postgresql://postgres:5432/tongtin` (PostgreSQL 16.15), `Started TongTinApplication in 3.777 seconds`, no seeder logs (off by default)
+- [x] Frontend `npx tsc --noEmit` clean; local dev flow (`start.sh`) unaffected
+- [x] In-browser click-through — DONE 2026-10-07 (fresh production build on `localhost:3001`,
+      browser tooling); web image rebuilt afterwards so the stack serves the same code
+- [x] Nothing committed (standing rule); stack left running — stop with `docker compose down`
+
+## i18n full-coverage pass (2026-10-07)
+
+> Requested: "help me fix errors and issues and switch languages some not translate."
+> Frontend-only (no backend/domain/API change — doc gate not triggered). See `plan.md` §10.
+
+- [x] Untranslated strings fixed across all pages: landing, host dashboard, host member
+      directory, group flows, notifications, `/host/subscription`, admin Plans/Hosts tabs
+      + extend modal; backend `SettingsCatalog` labels overridden via i18n maps with
+      `?? apiValue` fallback (no API change)
+- [x] **Bug fixed — page title reverted to Khmer**: Next.js re-applies the static root
+      metadata title on hydration/route changes; `LanguageProvider` now re-asserts
+      `document.title` (MutationObserver on `<head>`) + `documentElement.lang`
+- [x] Verified live in km/en/vi/zh (production build, browser tooling): content per locale
+      on landing, host dashboard, subscription, notifications, admin settings/plans/hosts;
+      title persists across reload and client-side nav in vi and zh (the previously
+      reverting cases)
+- [x] Date/money formatting confirmed correct for all 4 `dateLocale`s (headless Chromium
+      lacks km-KH ICU data — environment artifact, not an app bug)
+- [x] `tsc --noEmit` + `eslint` + `npm run build` (13/13 routes) clean
+- [x] Web Docker image rebuilt + recreated: `http://localhost:3000` serves the fixes
+      (healthy, proxy health UP, zh chunks present in image)
 
 ## Next action
 
 All 19 steps + post-delivery audit (`plan.md` §7) + Step 20 centralized settings module (`plan.md` §8)
-are delivered (2026-10-07). To run the full system with pre-seeded demo data anytime:
++ Step 21 full-stack Docker deployment (`plan.md` §9) + full 4-locale i18n pass (`plan.md` §10)
+are delivered (2026-10-07). The running stack at `http://localhost:3000` serves the i18n fixes
+(web image rebuilt).
+To run the whole stack in Docker (database + API + web), from the repo root:
 ```bash
-./start.sh --seed
+cp .env.example .env   # set JWT_SECRET; APP_SEED_DEMO=true for demo data
+docker compose up --build -d
 ```
-Follow-ups: quick live pass over the new admin settings tab (dev admin `0988999999` seeded locally);
-then the ranked candidates in `plan.md` §7.5 (real PayWay return-flow wiring, `payment_events`
-forensics, checkout idempotency, owner subscription index).
+For local development with pre-seeded demo data on the host: `./start.sh --seed`.
+Follow-ups: the ranked candidates in `plan.md` §7.5 (real PayWay return-flow wiring,
+`payment_events` forensics, checkout idempotency, owner subscription index).
 
 ## Blockers
 

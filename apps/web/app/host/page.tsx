@@ -142,18 +142,15 @@ export default function HostDashboardPage() {
                   ★
                 </span>
                 <div>
-                  <span className="font-bold">Gói dùng thử 1 tháng đang hoạt động:</span> Bạn còn{" "}
-                  <span className="font-extrabold text-emerald-700 dark:text-emerald-300">
-                    {subStatus.daysRemaining} ngày
-                  </span>{" "}
-                  trải nghiệm miễn phí đầy đủ tính năng.
+                  <span className="font-bold">{t.hostDashboard.subTrialTitle}</span>{" "}
+                  {t.hostDashboard.subTrialBody(subStatus.daysRemaining)}
                 </div>
               </div>
               <Link
                 href="/host/subscription"
                 className="inline-flex items-center gap-1.5 font-bold text-emerald-700 hover:text-emerald-600 dark:text-emerald-300 hover:underline"
               >
-                <span>Xem gói cước & ABA PayWay</span>
+                <span>{t.hostDashboard.subTrialCta}</span>
                 <ArrowRight className="h-3.5 w-3.5" />
               </Link>
             </div>
@@ -164,14 +161,15 @@ export default function HostDashboardPage() {
               <div className="flex items-center gap-2.5">
                 <AlertTriangle className="h-5 w-5 text-rose-600 shrink-0" />
                 <div>
-                  <span className="font-bold">Gói dịch vụ đã hết hạn:</span> Vui lòng gia hạn hoặc nâng cấp gói để tiếp tục tạo dây hụi và vận hành.
+                  <span className="font-bold">{t.hostDashboard.subExpiredTitle}</span>{" "}
+                  {t.hostDashboard.subExpiredBody}
                 </div>
               </div>
               <Link
                 href="/host/subscription"
                 className="inline-flex items-center gap-1.5 rounded-lg bg-rose-600 px-3 py-1.5 font-bold text-white shadow-sm hover:bg-rose-500 transition-colors"
               >
-                <span>Nâng cấp ngay</span>
+                <span>{t.hostDashboard.subUpgradeNow}</span>
                 <ArrowRight className="h-3.5 w-3.5" />
               </Link>
             </div>

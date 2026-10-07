@@ -104,7 +104,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   });
 
   if (!res.ok) {
-    let errorMsg = `Lỗi ${res.status}`;
+    let errorMsg = `Request failed (HTTP ${res.status})`;
     try {
       const errJson = await res.json();
       errorMsg = errJson.message || errJson.error || errorMsg;
