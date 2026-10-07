@@ -3,12 +3,14 @@
 import React, { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
+import { useLanguage } from "@/lib/i18n";
 import { EmptyState } from "@/components/EmptyState";
 import { Bell, CheckCheck, Check, Loader2 } from "lucide-react";
 
 type NotificationItem = Awaited<ReturnType<typeof api.getNotifications>>["notifications"][number];
 
 export default function NotificationsPage() {
+  const { language, t } = useLanguage();
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -69,15 +71,15 @@ export default function NotificationsPage() {
       <div className="flex items-center justify-between pb-6 border-b border-zinc-200 dark:border-zinc-800">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 flex items-center gap-2.5">
-            Thông Báo Hệ Thống
+            {t.notifications.title}
             {unreadCount > 0 && (
               <span className="rounded-full bg-rose-500 px-2.5 py-0.5 text-xs font-bold text-white">
-                {unreadCount} mới
+                {t.notifications.newBadge(unreadCount)}
               </span>
             )}
           </h1>
           <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-            Cập nhật diễn biến mở kỳ, công bố người hốt hụi và xác nhận tiền đóng
+            {t.notifications.subtitle}
           </p>
         </div>
 
@@ -87,7 +89,7 @@ export default function NotificationsPage() {
             className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-3.5 py-2 text-xs font-semibold text-zinc-700 shadow-sm hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 cursor-pointer"
           >
             <CheckCheck className="h-4 w-4 text-emerald-600" />
-            Đánh dấu tất cả đã đọc
+            {t.notifications.markAllRead}
           </button>
         )}
       </div>
@@ -95,8 +97,8 @@ export default function NotificationsPage() {
       {items.length === 0 ? (
         <EmptyState
           icon={Bell}
-          title="Không có thông báo nào"
-          description="Các thông báo mới về kỳ hụi và thanh toán sẽ hiển thị tại đây khi có diễn biến mới."
+          title={t.notifications.emptyTitle}
+          description={t.notifications.emptyDesc}
         />
       ) : (
         <div className="space-y-3">
@@ -124,7 +126,7 @@ export default function NotificationsPage() {
                     {item.body}
                   </p>
                   <span className="text-[11px] text-zinc-400">
-                    {formatDateTime(item.createdAt)}
+                    {formatDateTime(item.createdAt, language)}
                   </span>
                 </div>
 
@@ -132,7 +134,7 @@ export default function NotificationsPage() {
                   <button
                     onClick={() => handleMarkRead(item.id)}
                     className="shrink-0 rounded-lg p-1.5 text-zinc-400 hover:bg-emerald-100 hover:text-emerald-700 dark:hover:bg-emerald-900/40 dark:hover:text-emerald-300 transition-colors"
-                    title="Đánh dấu đã đọc"
+                    title={t.notifications.markReadTitle}
                   >
                     <Check className="h-4 w-4" />
                   </button>

@@ -4,11 +4,14 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { clearAuth, getStoredAuth, LoginResponse } from "@/lib/api";
+import { useLanguage } from "@/lib/i18n";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { Users, LayoutDashboard, Wallet, LogOut, Bell, Shield, ArrowRight } from "lucide-react";
 
 export function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
+  const { t } = useLanguage();
   const [auth, setAuth] = useState<LoginResponse | null>(null);
   const [apiUp, setApiUp] = useState<boolean | null>(null);
   const [unread, setUnread] = useState(0);
@@ -80,7 +83,7 @@ export function Navbar() {
                     }`}
                   >
                     <LayoutDashboard className="h-4 w-4" />
-                    Tổng quan
+                    {t.navbar.overview}
                   </Link>
                   <Link
                     href="/host/members"
@@ -91,7 +94,7 @@ export function Navbar() {
                     }`}
                   >
                     <Users className="h-4 w-4" />
-                    Hội viên
+                    {t.navbar.members}
                   </Link>
                 </>
               )}
@@ -105,16 +108,16 @@ export function Navbar() {
                   }`}
                 >
                   <Wallet className="h-4 w-4" />
-                  Dây hụi của tôi
+                  {t.navbar.myGroups}
                 </Link>
               )}
             </nav>
           )}
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5 sm:gap-3">
           {/* API Health indicator */}
-          <div className="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-full border border-zinc-200 bg-zinc-50 text-xs text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
+          <div className="hidden lg:flex items-center gap-2 px-2.5 py-1 rounded-full border border-zinc-200 bg-zinc-50 text-xs text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
             <span
               className={`h-2 w-2 rounded-full ${
                 apiUp === true
@@ -127,12 +130,15 @@ export function Navbar() {
             <span className="font-mono text-[11px]">API: {apiUp ? "UP" : apiUp === false ? "DOWN" : "..."}</span>
           </div>
 
+          {/* Language Switcher */}
+          <LanguageSwitcher />
+
           {auth ? (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5 sm:gap-3">
               <Link
                 href="/notifications"
                 className="relative p-2 rounded-lg text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800 transition-colors"
-                title="Thông báo"
+                title={t.navbar.notifications}
               >
                 <Bell className="h-4 w-4" />
                 {unread > 0 && (
@@ -145,16 +151,16 @@ export function Navbar() {
               <div className="hidden sm:flex flex-col items-end text-xs">
                 <span className="font-semibold text-zinc-900 dark:text-zinc-50">{auth.user.fullName}</span>
                 <span className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                  {isHost ? "Chủ Hụi" : "Hội viên"} • {auth.user.phone}
+                  {isHost ? t.navbar.roleHost : t.navbar.roleMember} • {auth.user.phone}
                 </span>
               </div>
 
               <button
                 onClick={handleLogout}
-                className="flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800 transition-colors"
+                className="flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
               >
                 <LogOut className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Thoát</span>
+                <span className="hidden sm:inline">{t.navbar.logout}</span>
               </button>
             </div>
           ) : (
@@ -163,13 +169,14 @@ export function Navbar() {
                 href="/login"
                 className="rounded-lg px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800 transition-colors"
               >
-                Đăng nhập
+                {t.navbar.login}
               </Link>
               <Link
                 href="/register/owner"
                 className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-500 transition-colors"
               >
-                Đăng ký Chủ Hụi
+                <span className="hidden sm:inline">{t.navbar.registerHost}</span>
+                <span className="sm:hidden">+</span>
                 <ArrowRight className="h-3 w-3" />
               </Link>
             </div>

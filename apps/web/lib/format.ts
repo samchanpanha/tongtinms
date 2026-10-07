@@ -1,3 +1,10 @@
+import {
+  getStoredLanguage,
+  getTranslations,
+  Language,
+  LANGUAGE_OPTIONS,
+} from "@/lib/i18n";
+
 export function formatMoney(
   amountMinor: number | bigint | string | null | undefined,
   currency: string = "VND",
@@ -24,11 +31,17 @@ export function formatMoney(
   return `${major.toLocaleString("en-US")} ${currency}`;
 }
 
-export function formatDate(isoString: string | null | undefined): string {
+function resolveDateLocale(lang?: Language): string {
+  const activeLang = lang || getStoredLanguage();
+  const opt = LANGUAGE_OPTIONS.find((o) => o.code === activeLang);
+  return opt ? opt.dateLocale : "km-KH";
+}
+
+export function formatDate(isoString: string | null | undefined, lang?: Language): string {
   if (!isoString) return "—";
   try {
     const d = new Date(isoString);
-    return d.toLocaleDateString("vi-VN", {
+    return d.toLocaleDateString(resolveDateLocale(lang), {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
@@ -38,11 +51,12 @@ export function formatDate(isoString: string | null | undefined): string {
   }
 }
 
-export function formatDateTime(isoString: string | null | undefined): string {
+export function formatDateTime(isoString: string | null | undefined, lang?: Language): string {
   if (!isoString) return "—";
   try {
     const d = new Date(isoString);
-    return `${d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })} • ${d.toLocaleDateString("vi-VN", {
+    const locale = resolveDateLocale(lang);
+    return `${d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })} • ${d.toLocaleDateString(locale, {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
@@ -61,79 +75,150 @@ export function formatPhone(phone: string | null | undefined): string {
   return p;
 }
 
-export function getGroupTypeLabel(type: string | null | undefined): string {
+export function getGroupTypeLabel(type: string | null | undefined, lang?: Language): string {
+  const t = getTranslations(lang || getStoredLanguage());
   switch (type) {
     case "BIDDING":
-      return "Hụi Đấu (Kín)";
+      return t.status.groupType.BIDDING;
     case "FIXED_EQUAL":
-      return "Hụi Thảo (Cố định)";
+      return t.status.groupType.FIXED_EQUAL;
     default:
       return type || "—";
   }
 }
 
-export function getCycleUnitLabel(unit: string | null | undefined): string {
+export function getCycleUnitLabel(unit: string | null | undefined, lang?: Language): string {
+  const t = getTranslations(lang || getStoredLanguage());
   switch (unit) {
     case "DAY":
-      return "Ngày";
+      return t.status.cycleUnit.DAY;
     case "WEEK":
-      return "Tuần";
+      return t.status.cycleUnit.WEEK;
     case "MONTH":
-      return "Tháng";
+      return t.status.cycleUnit.MONTH;
     default:
-      return unit || "Kỳ";
+      return unit || t.status.cycleUnit.DEFAULT;
   }
 }
 
-export function getGroupStatusBadge(status: string | null | undefined): { label: string; className: string } {
+export function getGroupStatusBadge(
+  status: string | null | undefined,
+  lang?: Language
+): { label: string; className: string } {
+  const t = getTranslations(lang || getStoredLanguage());
   switch (status) {
     case "DRAFT":
-      return { label: "Bản nháp", className: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700" };
+      return {
+        label: t.status.groupStatus.DRAFT,
+        className: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700",
+      };
     case "RECRUITING":
-      return { label: "Đang gom chân", className: "bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border-blue-200 dark:border-blue-800" };
+      return {
+        label: t.status.groupStatus.RECRUITING,
+        className: "bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border-blue-200 dark:border-blue-800",
+      };
     case "READY":
-      return { label: "Sẵn sàng", className: "bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-800" };
+      return {
+        label: t.status.groupStatus.READY,
+        className: "bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-800",
+      };
     case "RUNNING":
-      return { label: "Đang chạy", className: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800" };
+      return {
+        label: t.status.groupStatus.RUNNING,
+        className: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800",
+      };
     case "COMPLETED":
-      return { label: "Hoàn tất", className: "bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border-purple-200 dark:border-purple-800" };
+      return {
+        label: t.status.groupStatus.COMPLETED,
+        className: "bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border-purple-200 dark:border-purple-800",
+      };
     case "CANCELLED":
-      return { label: "Đã hủy", className: "bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border-rose-200 dark:border-rose-800" };
+      return {
+        label: t.status.groupStatus.CANCELLED,
+        className: "bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border-rose-200 dark:border-rose-800",
+      };
     default:
-      return { label: status || "—", className: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700" };
+      return {
+        label: status || "—",
+        className: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700",
+      };
   }
 }
 
-export function getCycleStatusBadge(status: string | null | undefined): { label: string; className: string } {
+export function getCycleStatusBadge(
+  status: string | null | undefined,
+  lang?: Language
+): { label: string; className: string } {
+  const t = getTranslations(lang || getStoredLanguage());
   switch (status) {
     case "DRAFT":
-      return { label: "Chưa mở", className: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700" };
+      return {
+        label: t.status.cycleStatus.DRAFT,
+        className: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700",
+      };
     case "OPEN":
-      return { label: "Đang mở", className: "bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border-blue-200 dark:border-blue-800" };
+      return {
+        label: t.status.cycleStatus.OPEN,
+        className: "bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border-blue-200 dark:border-blue-800",
+      };
     case "BIDDING":
-      return { label: "Đang bỏ thăm", className: "bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-800 animate-pulse" };
+      return {
+        label: t.status.cycleStatus.BIDDING,
+        className: "bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-800 animate-pulse",
+      };
     case "CLOSED_FOR_CALC":
-      return { label: "Đang tính tiền", className: "bg-orange-50 text-orange-700 dark:bg-orange-950/60 dark:text-orange-300 border-orange-200 dark:border-orange-800" };
+      return {
+        label: t.status.cycleStatus.CLOSED_FOR_CALC,
+        className: "bg-orange-50 text-orange-700 dark:bg-orange-950/60 dark:text-orange-300 border-orange-200 dark:border-orange-800",
+      };
     case "PAYOUT_PENDING":
-      return { label: "Chờ giao tiền", className: "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800" };
+      return {
+        label: t.status.cycleStatus.PAYOUT_PENDING,
+        className: "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800",
+      };
     case "SETTLED":
-      return { label: "Đã quyết toán", className: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800" };
+      return {
+        label: t.status.cycleStatus.SETTLED,
+        className: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800",
+      };
     case "FAILED":
-      return { label: "Thất bại", className: "bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border-rose-200 dark:border-rose-800" };
+      return {
+        label: t.status.cycleStatus.FAILED,
+        className: "bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border-rose-200 dark:border-rose-800",
+      };
     default:
-      return { label: status || "—", className: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700" };
+      return {
+        label: status || "—",
+        className: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700",
+      };
   }
 }
 
-export function getShareStatusBadge(status: string | null | undefined): { label: string; className: string } {
+export function getShareStatusBadge(
+  status: string | null | undefined,
+  lang?: Language
+): { label: string; className: string } {
+  const t = getTranslations(lang || getStoredLanguage());
   switch (status) {
     case "ALIVE":
-      return { label: "Hụi Sống (Chưa hốt)", className: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800" };
+      return {
+        label: t.status.shareStatus.ALIVE,
+        className: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800",
+      };
     case "DEAD":
-      return { label: "Hụi Chết (Đã hốt)", className: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700" };
+      return {
+        label: t.status.shareStatus.DEAD,
+        className: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700",
+      };
     case "DEFAULTED":
-      return { label: "Bể hụi (Mất khả năng)", className: "bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border-rose-200 dark:border-rose-800" };
+      return {
+        label: t.status.shareStatus.DEFAULTED,
+        className: "bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border-rose-200 dark:border-rose-800",
+      };
     default:
-      return { label: status || "—", className: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700" };
+      return {
+        label: status || "—",
+        className: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700",
+      };
   }
 }

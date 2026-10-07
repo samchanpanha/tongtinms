@@ -1,9 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ["*.e2b.app", "*.monkeycode-ai.live", "localhost:3000"],
   experimental: {
     serverActions: {
-      allowedOrigins: ["*.monkeycode-ai.live", "localhost:3000"],
+      allowedOrigins: ["*.e2b.app", "*.monkeycode-ai.live", "localhost:3000"],
     },
   },
   async rewrites() {

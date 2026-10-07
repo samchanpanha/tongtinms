@@ -5,13 +5,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { formatMoney } from "@/lib/format";
+import { useLanguage } from "@/lib/i18n";
 import { Layers, ArrowRight, AlertCircle, Sparkles, Calculator } from "lucide-react";
 
 export default function CreateGroupPage() {
   const router = useRouter();
+  const { t } = useLanguage();
 
   // Form State
-  const [name, setName] = useState("Hụi Tháng 1 Triệu");
+  const [name, setName] = useState("");
   const [type, setType] = useState<"BIDDING" | "FIXED_EQUAL">("BIDDING");
   const [baseAmount, setBaseAmount] = useState<number>(1_000_000);
   const [shareCount, setShareCount] = useState<number>(10);
@@ -30,6 +32,7 @@ export default function CreateGroupPage() {
   // Live pot preview estimate
   const estimatedGross = (shareCount - 1) * baseAmount;
   const estimatedNet = hostFeeType === "FIXED_PER_CYCLE" ? estimatedGross - hostFeeMinor : estimatedGross;
+  const effectiveName = name || t.createGroup.defaultGroupName;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,7 +41,7 @@ export default function CreateGroupPage() {
 
     try {
       const payload: Record<string, unknown> = {
-        name: name.trim(),
+        name: effectiveName.trim(),
         type,
         baseAmount,
         shareCount,
@@ -61,7 +64,7 @@ export default function CreateGroupPage() {
       const res = await api.createGroup(payload);
       router.push(`/host/groups/${res.id}`);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Tạo dây hụi thất bại. Vui lòng kiểm tra lại thông tin.");
+      setError(err instanceof Error ? err.message : t.createGroup.defaultError);
     } finally {
       setLoading(false);
     }
@@ -73,17 +76,17 @@ export default function CreateGroupPage() {
       <div className="flex items-center justify-between pb-6 border-b border-zinc-200 dark:border-zinc-800">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-            Tạo Dây Hụi Mới
+            {t.createGroup.title}
           </h1>
           <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            Thiết lập quy chế, phần tiền chân, số chân hụi và công thức tính tiền thảo
+            {t.createGroup.subtitle}
           </p>
         </div>
         <Link
           href="/host"
           className="rounded-xl border border-zinc-200 bg-white px-4 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 transition-colors"
         >
-          Hủy bỏ
+          {t.createGroup.cancelBtn}
         </Link>
       </div>
 
@@ -97,63 +100,63 @@ export default function CreateGroupPage() {
       <form onSubmit={handleSubmit} className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-3">
         {/* Left 2 Cols: Form Fields */}
         <div className="space-y-6 lg:col-span-2">
-          {/* Card 1: Thông tin cơ bản */}
+          {/* Card 1: General Info */}
           <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60 space-y-4">
             <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
               <Layers className="h-4 w-4 text-emerald-600" />
-              1. Thông tin chung
+              {t.createGroup.section1Title}
             </h3>
 
             <div>
               <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                Tên dây hụi *
+                {t.createGroup.groupNameLabel}
               </label>
               <input
                 type="text"
                 required
-                value={name}
+                value={effectiveName}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Ví dụ: Hụi Tháng 1 Triệu (Nhóm Chợ Lớn)"
+                placeholder={t.createGroup.groupNamePlaceholder}
                 className="mt-1 w-full rounded-xl border border-zinc-200 bg-zinc-50/50 py-2.5 px-3.5 text-sm text-zinc-900 outline-none focus:border-emerald-500 focus:bg-white dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-100"
               />
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                Loại hình hụi *
+                {t.createGroup.groupTypeLabel}
               </label>
               <div className="mt-1.5 grid grid-cols-2 gap-3">
                 <button
                   type="button"
                   onClick={() => setType("BIDDING")}
-                  className={`rounded-xl border p-3.5 text-left transition-all ${
+                  className={`rounded-xl border p-3.5 text-left transition-all cursor-pointer ${
                     type === "BIDDING"
                       ? "border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/30"
                       : "border-zinc-200 bg-white hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900"
                   }`}
                 >
                   <span className="block text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                    Hụi Đấu (Kín)
+                    {t.createGroup.biddingTitle}
                   </span>
                   <span className="block text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                    Hội viên bỏ thăm giá, người bỏ cao nhất được hốt hụi kỳ đó.
+                    {t.createGroup.biddingDesc}
                   </span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setType("FIXED_EQUAL")}
-                  className={`rounded-xl border p-3.5 text-left transition-all ${
+                  className={`rounded-xl border p-3.5 text-left transition-all cursor-pointer ${
                     type === "FIXED_EQUAL"
                       ? "border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/30"
                       : "border-zinc-200 bg-white hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900"
                   }`}
                 >
                   <span className="block text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                    Hụi Thảo (Cố định)
+                    {t.createGroup.fixedTitle}
                   </span>
                   <span className="block text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                    Không bỏ thăm. Lần lượt hốt theo số thứ tự chân hụi.
+                    {t.createGroup.fixedDesc}
                   </span>
                 </button>
               </div>
@@ -162,7 +165,7 @@ export default function CreateGroupPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                  Phần tiền chân (C) *
+                  {t.createGroup.baseAmountLabel}
                 </label>
                 <div className="relative mt-1">
                   <input
@@ -182,7 +185,7 @@ export default function CreateGroupPage() {
 
               <div>
                 <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                  Số chân hụi (N) *
+                  {t.createGroup.shareCountLabel}
                 </label>
                 <input
                   type="number"
@@ -199,22 +202,22 @@ export default function CreateGroupPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                  Đơn vị chu kỳ *
+                  {t.createGroup.cycleUnitLabel}
                 </label>
                 <select
                   value={cycleUnit}
                   onChange={(e) => setCycleUnit(e.target.value as "MONTH" | "WEEK" | "DAY")}
                   className="mt-1 w-full rounded-xl border border-zinc-200 bg-zinc-50/50 py-2.5 px-3.5 text-sm text-zinc-900 outline-none focus:border-emerald-500 focus:bg-white dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-100"
                 >
-                  <option value="MONTH">Hàng tháng (MONTH)</option>
-                  <option value="WEEK">Hàng tuần (WEEK)</option>
-                  <option value="DAY">Hàng ngày (DAY)</option>
+                  <option value="MONTH">{t.createGroup.unitMonth}</option>
+                  <option value="WEEK">{t.createGroup.unitWeek}</option>
+                  <option value="DAY">{t.createGroup.unitDay}</option>
                 </select>
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                  Thời hạn đóng hụi (ngày sau mở kỳ)
+                  {t.createGroup.bidCloseOffsetLabel}
                 </label>
                 <input
                   type="number"
@@ -230,62 +233,62 @@ export default function CreateGroupPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                  Loại tiền tệ (Currency) *
+                  {t.createGroup.currencyLabel}
                 </label>
                 <select
                   value={currency}
                   onChange={(e) => setCurrency(e.target.value)}
                   className="mt-1 w-full rounded-xl border border-zinc-200 bg-zinc-50/50 py-2.5 px-3.5 text-sm text-zinc-900 outline-none focus:border-emerald-500 focus:bg-white dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-100"
                 >
-                  <option value="VND">VND (Việt Nam Đồng)</option>
-                  <option value="USD">USD (Đô la Mỹ)</option>
-                  <option value="KHR">KHR (Riel Campuchia)</option>
+                  <option value="VND">{t.createGroup.currencyVND}</option>
+                  <option value="USD">{t.createGroup.currencyUSD}</option>
+                  <option value="KHR">{t.createGroup.currencyKHR}</option>
                 </select>
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                  Quy tắc xử lý bằng thăm (Tie-Break) *
+                  {t.createGroup.tieBreakLabel}
                 </label>
                 <select
                   value={tieBreak}
                   onChange={(e) => setTieBreak(e.target.value)}
                   className="mt-1 w-full rounded-xl border border-zinc-200 bg-zinc-50/50 py-2.5 px-3.5 text-sm text-zinc-900 outline-none focus:border-emerald-500 focus:bg-white dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-100"
                 >
-                  <option value="EARLIEST_BID">Bỏ trước thắng (Ưu tiên người nộp thăm sớm)</option>
-                  <option value="LOTTERY">Bốc thăm ngẫu nhiên</option>
+                  <option value="EARLIEST_BID">{t.createGroup.tieEarliest}</option>
+                  <option value="LOTTERY">{t.createGroup.tieLottery}</option>
                 </select>
               </div>
             </div>
           </div>
 
-          {/* Card 2: Tiền Thảo & Bỏ Thăm */}
+          {/* Card 2: Commission & Bidding */}
           <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60 space-y-4">
             <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
               <Calculator className="h-4 w-4 text-emerald-600" />
-              2. Tiền thảo & Giới hạn bỏ thăm
+              {t.createGroup.section2Title}
             </h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                  Cách tính tiền thảo Chủ Hụi *
+                  {t.createGroup.hostFeeTypeLabel}
                 </label>
                 <select
                   value={hostFeeType}
                   onChange={(e) => setHostFeeType(e.target.value as "FIXED_PER_CYCLE" | "PERCENT_OF_POT" | "NONE")}
                   className="mt-1 w-full rounded-xl border border-zinc-200 bg-zinc-50/50 py-2.5 px-3.5 text-sm text-zinc-900 outline-none focus:border-emerald-500 focus:bg-white dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-100"
                 >
-                  <option value="FIXED_PER_CYCLE">Cố định theo kỳ (VND)</option>
-                  <option value="PERCENT_OF_POT">Theo % tổng gom (1%)</option>
-                  <option value="NONE">Không thu tiền thảo</option>
+                  <option value="FIXED_PER_CYCLE">{t.createGroup.feeFixed}</option>
+                  <option value="PERCENT_OF_POT">{t.createGroup.feePercent}</option>
+                  <option value="NONE">{t.createGroup.feeNone}</option>
                 </select>
               </div>
 
               {hostFeeType === "FIXED_PER_CYCLE" && (
                 <div>
                   <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                    Mức tiền thảo mỗi kỳ (T)
+                    {t.createGroup.hostFeeAmountLabel}
                   </label>
                   <input
                     type="number"
@@ -303,7 +306,7 @@ export default function CreateGroupPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-zinc-200/60 dark:border-zinc-700/60">
                 <div>
                   <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                    Thăm bỏ tối đa (Max Bid)
+                    {t.createGroup.maxBidLabel}
                   </label>
                   <input
                     type="number"
@@ -313,12 +316,14 @@ export default function CreateGroupPage() {
                     onChange={(e) => setMaxBid(Number(e.target.value))}
                     className="mt-1 w-full rounded-xl border border-zinc-200 bg-zinc-50/50 py-2.5 px-3.5 text-sm text-zinc-900 outline-none focus:border-emerald-500 focus:bg-white dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-100"
                   />
-                  <p className="mt-1 text-[11px] text-zinc-500">Phải nhỏ hơn tiền chân ({formatMoney(baseAmount)})</p>
+                  <p className="mt-1 text-[11px] text-zinc-500">
+                    {t.createGroup.maxBidHint(formatMoney(baseAmount, currency))}
+                  </p>
                 </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                    Bước giá bỏ thăm (Bid Step)
+                    {t.createGroup.bidStepLabel}
                   </label>
                   <input
                     type="number"
@@ -328,7 +333,7 @@ export default function CreateGroupPage() {
                     onChange={(e) => setBidStep(Number(e.target.value))}
                     className="mt-1 w-full rounded-xl border border-zinc-200 bg-zinc-50/50 py-2.5 px-3.5 text-sm text-zinc-900 outline-none focus:border-emerald-500 focus:bg-white dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-100"
                   />
-                  <p className="mt-1 text-[11px] text-zinc-500">Bội số hợp lệ (ví dụ: 10.000 đ)</p>
+                  <p className="mt-1 text-[11px] text-zinc-500">{t.createGroup.bidStepHint}</p>
                 </div>
               </div>
             )}
@@ -340,33 +345,41 @@ export default function CreateGroupPage() {
           <div className="rounded-2xl border border-emerald-500/20 bg-emerald-50/40 p-6 dark:bg-emerald-950/20 space-y-4">
             <div className="flex items-center gap-2 text-sm font-bold text-emerald-900 dark:text-emerald-200">
               <Sparkles className="h-4 w-4 text-emerald-600" />
-              Tóm tắt Dây Hụi
+              {t.createGroup.summaryTitle}
             </div>
 
             <div className="space-y-3 text-xs text-zinc-600 dark:text-zinc-300">
               <div className="flex justify-between py-1 border-b border-emerald-200/50 dark:border-emerald-900/40">
-                <span>Số chân / Số kỳ:</span>
-                <span className="font-bold text-zinc-900 dark:text-zinc-100">{shareCount} chân</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-emerald-200/50 dark:border-emerald-900/40">
-                <span>Tiền chân mỗi suất:</span>
-                <span className="font-bold text-zinc-900 dark:text-zinc-100">{formatMoney(baseAmount, currency)}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-emerald-200/50 dark:border-emerald-900/40">
-                <span>Tiền thảo mỗi kỳ:</span>
-                <span className="font-bold text-emerald-700 dark:text-emerald-300">
-                  {hostFeeType === "FIXED_PER_CYCLE" ? formatMoney(hostFeeMinor, currency) : "1% tổng gom"}
+                <span>{t.createGroup.summarySharesLabel}</span>
+                <span className="font-bold text-zinc-900 dark:text-zinc-100">
+                  {t.createGroup.summarySharesValue(shareCount)}
                 </span>
               </div>
               <div className="flex justify-between py-1 border-b border-emerald-200/50 dark:border-emerald-900/40">
-                <span>Tổng thảo cả dây ({shareCount} kỳ):</span>
+                <span>{t.createGroup.summaryBaseAmountLabel}</span>
+                <span className="font-bold text-zinc-900 dark:text-zinc-100">
+                  {formatMoney(baseAmount, currency)}
+                </span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-emerald-200/50 dark:border-emerald-900/40">
+                <span>{t.createGroup.summaryFeePerCycleLabel}</span>
+                <span className="font-bold text-emerald-700 dark:text-emerald-300">
+                  {hostFeeType === "FIXED_PER_CYCLE"
+                    ? formatMoney(hostFeeMinor, currency)
+                    : t.createGroup.summaryFeePercentValue}
+                </span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-emerald-200/50 dark:border-emerald-900/40">
+                <span>{t.createGroup.summaryTotalFeeLabel(shareCount)}</span>
                 <span className="font-bold text-emerald-700 dark:text-emerald-300">
                   {formatMoney(hostFeeMinor * shareCount, currency)}
                 </span>
               </div>
               <div className="flex justify-between py-1">
-                <span>Ước tính hốt kỳ đầu (bình quân):</span>
-                <span className="font-bold text-zinc-900 dark:text-zinc-100">~{formatMoney(estimatedNet, currency)}</span>
+                <span>{t.createGroup.summaryEstFirstNetLabel}</span>
+                <span className="font-bold text-zinc-900 dark:text-zinc-100">
+                  ~{formatMoney(estimatedNet, currency)}
+                </span>
               </div>
             </div>
 
@@ -375,7 +388,7 @@ export default function CreateGroupPage() {
               disabled={loading}
               className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white shadow-md shadow-emerald-600/20 hover:bg-emerald-500 disabled:opacity-50 transition-all cursor-pointer"
             >
-              {loading ? "Đang tạo..." : "Xác nhận tạo dây hụi"}
+              {loading ? t.createGroup.creatingBtn : t.createGroup.submitBtn}
               <ArrowRight className="h-4 w-4" />
             </button>
           </div>
