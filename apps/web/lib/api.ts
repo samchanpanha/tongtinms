@@ -404,7 +404,8 @@ export const api = {
     shares: Array<{
       shareId: number;
       shareNo: number;
-      shareStatus: string;
+      status?: string;
+      shareStatus?: string;
       entries: Array<{
         entryId: number;
         cycleNo: number;
@@ -412,8 +413,18 @@ export const api = {
         direction: string;
         amount: { currency: string; amountMinor: number; exponent: number; symbol: string };
         status: string;
-        runningPosition: { currency: string; amountMinor: number; exponent: number; symbol: string };
+        dueAt?: string;
+        allocated?: { currency: string; amountMinor: number; exponent: number; symbol: string };
+        remaining?: { currency: string; amountMinor: number; exponent: number; symbol: string };
+        runningBalance?: { currency: string; amountMinor: number; exponent: number; symbol: string };
+        runningPosition?: { currency: string; amountMinor: number; exponent: number; symbol: string };
       }>;
+      totals?: {
+        contributed: { currency: string; amountMinor: number; exponent: number; symbol: string };
+        received: { currency: string; amountMinor: number; exponent: number; symbol: string };
+        feesPaid: { currency: string; amountMinor: number; exponent: number; symbol: string };
+        netPosition: { currency: string; amountMinor: number; exponent: number; symbol: string };
+      };
     }>;
     totals: {
       contributed: { currency: string; amountMinor: number; exponent: number; symbol: string };

@@ -315,62 +315,64 @@ export default function MemberGroupDetailPage({
           {statement ? (
             <>
               {/* Summary Metrics */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60">
-                  <span className="text-xs font-medium text-zinc-500">
-                    {t.memberGroupDetail.contributedLabel}
-                  </span>
-                  <p className="mt-2 text-2xl font-bold text-zinc-900 dark:text-zinc-50">
-                    {formatMoney(
-                      statement.totals.contributed.amountMinor,
-                      statement.totals.contributed.currency
-                    )}
-                  </p>
+              {statement.totals && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                  <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60">
+                    <span className="text-xs font-medium text-zinc-500">
+                      {t.memberGroupDetail.contributedLabel}
+                    </span>
+                    <p className="mt-2 text-2xl font-bold text-zinc-900 dark:text-zinc-50">
+                      {formatMoney(
+                        statement.totals.contributed?.amountMinor ?? 0,
+                        statement.totals.contributed?.currency || statement.currency
+                      )}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60">
+                    <span className="text-xs font-medium text-zinc-500">
+                      {t.memberGroupDetail.receivedLabel}
+                    </span>
+                    <p className="mt-2 text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                      {formatMoney(
+                        statement.totals.received?.amountMinor ?? 0,
+                        statement.totals.received?.currency || statement.currency
+                      )}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60">
+                    <span className="text-xs font-medium text-zinc-500">
+                      {t.memberGroupDetail.feesLabel}
+                    </span>
+                    <p className="mt-2 text-2xl font-bold text-zinc-500">
+                      {formatMoney(
+                        statement.totals.feesPaid?.amountMinor ?? 0,
+                        statement.totals.feesPaid?.currency || statement.currency
+                      )}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60">
+                    <span className="text-xs font-medium text-zinc-500">
+                      {t.memberGroupDetail.netPositionLabel}
+                    </span>
+                    <p
+                      className={`mt-2 text-2xl font-bold ${
+                        (statement.totals.netPosition?.amountMinor ?? 0) >= 0
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : "text-amber-600 dark:text-amber-400"
+                      }`}
+                    >
+                      {formatMoney(
+                        statement.totals.netPosition?.amountMinor ?? 0,
+                        statement.totals.netPosition?.currency || statement.currency
+                      )}
+                    </p>
+                  </div>
                 </div>
-                <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60">
-                  <span className="text-xs font-medium text-zinc-500">
-                    {t.memberGroupDetail.receivedLabel}
-                  </span>
-                  <p className="mt-2 text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-                    {formatMoney(
-                      statement.totals.received.amountMinor,
-                      statement.totals.received.currency
-                    )}
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60">
-                  <span className="text-xs font-medium text-zinc-500">
-                    {t.memberGroupDetail.feesLabel}
-                  </span>
-                  <p className="mt-2 text-2xl font-bold text-zinc-500">
-                    {formatMoney(
-                      statement.totals.feesPaid.amountMinor,
-                      statement.totals.feesPaid.currency
-                    )}
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60">
-                  <span className="text-xs font-medium text-zinc-500">
-                    {t.memberGroupDetail.netPositionLabel}
-                  </span>
-                  <p
-                    className={`mt-2 text-2xl font-bold ${
-                      statement.totals.netPosition.amountMinor >= 0
-                        ? "text-emerald-600 dark:text-emerald-400"
-                        : "text-amber-600 dark:text-amber-400"
-                    }`}
-                  >
-                    {formatMoney(
-                      statement.totals.netPosition.amountMinor,
-                      statement.totals.netPosition.currency
-                    )}
-                  </p>
-                </div>
-              </div>
+              )}
 
               {/* Per-share breakdown */}
               <div className="space-y-6">
-                {statement.shares.map((share) => (
+                {(statement.shares || []).map((share) => (
                   <div
                     key={share.shareId}
                     className="overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60"
@@ -380,7 +382,8 @@ export default function MemberGroupDetailPage({
                         {t.memberGroupDetail.shareTitle(share.shareNo)}
                       </span>
                       <span className="text-xs text-zinc-500">
-                        {t.memberGroupDetail.statusLabel} <strong>{share.shareStatus}</strong>
+                        {t.memberGroupDetail.statusLabel}{" "}
+                        <strong>{share.status || share.shareStatus || "-"}</strong>
                       </span>
                     </div>
 
@@ -397,30 +400,34 @@ export default function MemberGroupDetailPage({
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/40">
-                        {share.entries.map((e) => (
-                          <tr key={e.entryId}>
-                            <td className="py-3 pl-6 pr-3 font-semibold">
-                              {t.memberGroupDetail.cycleNo(e.cycleNo)}
-                            </td>
-                            <td className="px-3 py-3">
-                              {e.type === "CONTRIBUTION"
-                                ? t.memberGroupDetail.entryContribution
-                                : t.memberGroupDetail.entryPayout}
-                            </td>
-                            <td className="px-3 py-3 font-bold">
-                              {formatMoney(e.amount.amountMinor, e.amount.currency)}
-                            </td>
-                            <td className="px-3 py-3">
-                              <span className="font-medium text-emerald-600">{e.status}</span>
-                            </td>
-                            <td className="py-3 pl-3 pr-6 text-right font-bold font-mono">
-                              {formatMoney(
-                                e.runningPosition.amountMinor,
-                                e.runningPosition.currency
-                              )}
-                            </td>
-                          </tr>
-                        ))}
+                        {(share.entries || []).map((e) => {
+                          const balance = e.runningBalance || e.runningPosition;
+                          return (
+                            <tr key={e.entryId}>
+                              <td className="py-3 pl-6 pr-3 font-semibold">
+                                {t.memberGroupDetail.cycleNo(e.cycleNo)}
+                              </td>
+                              <td className="px-3 py-3">
+                                {e.type === "CONTRIBUTION"
+                                  ? t.memberGroupDetail.entryContribution
+                                  : t.memberGroupDetail.entryPayout}
+                              </td>
+                              <td className="px-3 py-3 font-bold">
+                                {e.amount
+                                  ? formatMoney(e.amount.amountMinor, e.amount.currency)
+                                  : "-"}
+                              </td>
+                              <td className="px-3 py-3">
+                                <span className="font-medium text-emerald-600">{e.status}</span>
+                              </td>
+                              <td className="py-3 pl-3 pr-6 text-right font-bold font-mono">
+                                {balance
+                                  ? formatMoney(balance.amountMinor, balance.currency)
+                                  : "-"}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>

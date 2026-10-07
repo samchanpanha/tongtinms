@@ -23,6 +23,18 @@ cleanup() {
     echo "  - Stopping Frontend Web (PID $WEB_PID)..."
     kill "$WEB_PID" 2>/dev/null || true
   fi
+  if command -v lsof &> /dev/null; then
+    local P8080
+    P8080=$(lsof -ti :8080 2>/dev/null || true)
+    if [ -n "$P8080" ]; then
+      kill -9 $P8080 2>/dev/null || true
+    fi
+    local P3000
+    P3000=$(lsof -ti :3000 2>/dev/null || true)
+    if [ -n "$P3000" ]; then
+      kill -9 $P3000 2>/dev/null || true
+    fi
+  fi
   echo "✓ Services stopped cleanly."
   exit 0
 }
@@ -85,6 +97,17 @@ fi
 if [ "$MODE" == "all" ] || [ "$MODE" == "api" ]; then
   echo ""
   echo "⚙️  [2/3] Khởi động Backend API (Spring Boot Java 21)..."
+
+  # Ensure port 8080 is not occupied by an orphan process
+  if command -v lsof &> /dev/null; then
+    OLD_API_PID=$(lsof -ti :8080 2>/dev/null || true)
+    if [ -n "$OLD_API_PID" ]; then
+      echo "  ⚠️ Cổng 8080 đang bị chiếm bởi PID $OLD_API_PID. Đang giải phóng cổng..."
+      kill -9 $OLD_API_PID 2>/dev/null || true
+      sleep 1
+    fi
+  fi
+
   SPRING_OPTS="-Dspring.profiles.active=default"
   if [ "$SEED_FLAG" == "true" ]; then
     SPRING_OPTS="$SPRING_OPTS -Dapp.seed-demo=true"
@@ -118,6 +141,17 @@ fi
 if [ "$MODE" == "all" ] || [ "$MODE" == "web" ]; then
   echo ""
   echo "🌐 [3/3] Khởi động Frontend Web (Next.js 16 + Tailwind CSS v4)..."
+
+  # Ensure port 3000 is not occupied by an orphan process
+  if command -v lsof &> /dev/null; then
+    OLD_WEB_PID=$(lsof -ti :3000 2>/dev/null || true)
+    if [ -n "$OLD_WEB_PID" ]; then
+      echo "  ⚠️ Cổng 3000 đang bị chiếm bởi PID $OLD_WEB_PID. Đang giải phóng cổng..."
+      kill -9 $OLD_WEB_PID 2>/dev/null || true
+      sleep 1
+    fi
+  fi
+
   (
     cd "$WEB_DIR"
     npm run dev
