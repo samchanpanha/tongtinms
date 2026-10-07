@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tong Tin Manager - Plan</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --line: #334155;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --ok: #34d399;
+      --warn: #fbbf24;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; height: 100%;
+      background: var(--bg); color: var(--text);
+      font-family: Georgia, "Times New Roman", serif;
+    }
+    .deck { height: 100%; overflow: hidden; }
+    .slide {
+      display: none;
+      height: 100%;
+      padding: 56px 72px 72px;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .slide.on { display: flex; }
+    h1 { font-size: 42px; margin: 0 0 12px; letter-spacing: -0.03em; }
+    h2 { font-size: 28px; margin: 0 0 20px; color: var(--accent); }
+    p, li { font-size: 20px; line-height: 1.45; }
+    .muted { color: var(--muted); font-size: 16px; }
+    .kicker { color: var(--accent); font-size: 14px; letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 12px; }
+    ul { margin: 8px 0 0; padding-left: 22px; }
+    li { margin: 8px 0; }
+    table { border-collapse: collapse; width: 100%; font-size: 16px; }
+    th, td { border-bottom: 1px solid var(--line); text-align: left; padding: 8px 10px; }
+    th { color: var(--muted); font-weight: 600; }
+    code { font-family: ui-monospace, Menlo, Consolas, monospace; color: var(--ok); }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; }
+    .bar {
+      position: fixed; left: 0; right: 0; bottom: 0;
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 10px 24px; font-size: 13px; color: var(--muted);
+      background: rgba(15,23,42,0.92); border-top: 1px solid var(--line);
+    }
+    button {
+      background: transparent; color: var(--text); border: 1px solid var(--line);
+      border-radius: 8px; padding: 6px 12px; cursor: pointer;
+    }
+    .warn { color: var(--warn); }
+  </style>
+</head>
+<body>
+  <div class="deck" id="deck">
+    <section class="slide on">
+      <div class="kicker">Tong Tin / Hoi / Chui / ROSCA</div>
+      <h1>Tong Tin Manager</h1>
+      <p>Digital ledger for rotating savings groups. Host and members share one source of truth.</p>
+      <p class="muted">Planning summary. Build is one step at a time from docs/STATUS.md.</p>
+    </section>
+
+    <section class="slide">
+      <h2>Problem</h2>
+      <div class="row">
+        <div class="card">
+          <p>Paper and Excel</p>
+          <ul>
+            <li>Math errors on each ky</li>
+            <li>Sealed bids leak or get lost</li>
+            <li>Hoi Chet vs Hoi Song mix-ups</li>
+            <li>Host profit is opaque</li>
+          </ul>
+        </div>
+        <div class="card">
+          <p>This system</p>
+          <ul>
+            <li>Server-side formulas</li>
+            <li>Sealed digital bids</li>
+            <li>Append-only ledger</li>
+            <li>Owner and member portals</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <h2>Actors</h2>
+      <table>
+        <tr><th>Role</th><th>Vietnamese</th><th>MVP</th></tr>
+        <tr><td>Owner</td><td>Chu Hoi</td><td>Self-register tenant, run groups</td></tr>
+        <tr><td>Member</td><td>Hoi Vien</td><td>Paper profile first, invite login later</td></tr>
+        <tr><td>Share</td><td>Phan</td><td>Alive then Dead after winning pot</td></tr>
+        <tr><td>Admin</td><td>Quan tri</td><td>Later</td></tr>
+      </table>
+      <p class="muted">Public signup is owner-only. One person can be owner in their tenant and member elsewhere.</p>
+    </section>
+
+    <section class="slide">
+      <h2>Core loop</h2>
+      <p>Group DRAFT to RUNNING. One cycle at a time.</p>
+      <p><code>open → bid (if khui) → close → calculate → pay in → payout → settle</code></p>
+      <ul>
+        <li>Winner share pays 0 that cycle, then becomes Hoi Chet</li>
+        <li>Dead shares pay full base amount C</li>
+        <li>Last bidding cycle: B = 0, no auction</li>
+      </ul>
+    </section>
+
+    <section class="slide">
+      <h2>Default formulas</h2>
+      <div class="card">
+        <p>BIDDING_CLASSIC (Hoi khui)</p>
+        <p><code>grossPot = D*C + (A-1)*(C-B)</code></p>
+        <p><code>netPayout = grossPot - T</code></p>
+      </div>
+      <p></p>
+      <div class="card">
+        <p>FIXED_EQUAL (Hoi deu)</p>
+        <p><code>grossPot = (N-1)*C</code></p>
+      </div>
+      <p class="muted">Fixture A: N=10, C=1,000,000, T=100,000, cycle1 B=200,000 → net 7,100,000.</p>
+    </section>
+
+    <section class="slide">
+      <h2>Custom formula rules</h2>
+      <ul>
+        <li>Host edits parameters on a system preset. That is the product.</li>
+        <li>Owner template = saved parameters (mau hoi), no new algebra.</li>
+        <li>New calculator only via code + fixtures, never eval / JS / Excel.</li>
+        <li>Must keep winnerPay = 0, integer minor units, last cycle B = 0.</li>
+        <li>RUNNING groups freeze preset + engineVersion.</li>
+      </ul>
+    </section>
+
+    <section class="slide">
+      <h2>Multi-currency</h2>
+      <ul>
+        <li>Choose currency per group. Owner default VND.</li>
+        <li>Store bigint <strong>minor units</strong>. VND exponent 0, USD/THB 2.</li>
+        <li>Every money row and every report carries currency + exponent.</li>
+        <li>No FX. Host profit is grouped by currency, never summed across codes.</li>
+        <li>host_fee_minor vs host_fee_bps — percent is not money.</li>
+      </ul>
+    </section>
+
+    <section class="slide">
+      <h2>Schema (money)</h2>
+      <p><code>currencies(code, exponent, symbol)</code></p>
+      <p><code>groups.currency</code> FK, frozen at START. All group money is minor units of that code.</p>
+      <p>Copied onto <code>cycles</code>, <code>bids</code>, <code>ledger_entries</code>, <code>payments</code>.</p>
+      <p>JSON: <code>{ currency, amountMinor, exponent, symbol }</code></p>
+    </section>
+
+    <section class="slide">
+      <h2>Safety extras (parked)</h2>
+      <table>
+        <tr><th>Keep</th><th>Do not build</th></tr>
+        <tr><td>Owner-local phone blacklist</td><td>Global public shame list</td></tr>
+        <tr><td>Group design templates</td><td>CSS theme marketplace</td></tr>
+        <tr><td>Cycle math snapshot + dispute lock</td><td>Meeting video / chat</td></tr>
+        <tr><td>Sealed bids + audit log</td><td>Browser as payout truth</td></tr>
+      </table>
+    </section>
+
+    <section class="slide">
+      <h2>Stack (MVP)</h2>
+      <ul>
+        <li>Next.js web, Spring Boot API, PostgreSQL</li>
+        <li>Modular monolith, JWT, Flyway</li>
+        <li>Frontend reverse-proxies /api (one preview port)</li>
+        <li>Formula engine: pure Java, no Spring in the calculator</li>
+      </ul>
+    </section>
+
+    <section class="slide">
+      <h2>Build order</h2>
+      <p>01 skeleton → 02 Flyway → 03 owner register → 04 members → 05 group draft</p>
+      <p>06 shares → 07 formula tests → 08 cycle → 09 sealed bid → 10 calculate</p>
+      <p>11 payments → 12 host UI → 13 member UI → 14 notify → 15 reports</p>
+      <p class="muted">One step per session. Current: Step 01. Skill: tongtin-continue.</p>
+    </section>
+
+    <section class="slide">
+      <h2>How to continue</h2>
+      <p>Say: <code>Continue Tong Tin from docs/STATUS.md. Do only the current step.</code></p>
+      <p>Or: <code>Build step 01</code></p>
+      <p class="warn">Do not publish an empty repo. Code starts at step 01.</p>
+    </section>
+  </div>
+  <div class="bar">
+    <span>Tong Tin Manager</span>
+    <span>
+      <button type="button" id="prev">Prev</button>
+      <span id="pos">1 / 1</span>
+      <button type="button" id="next">Next</button>
+    </span>
+    <span>Arrow keys or click</span>
+  </div>
+  <script>
+    const slides = Array.from(document.querySelectorAll(".slide"));
+    let i = 0;
+    function show(n) {
+      i = (n + slides.length) % slides.length;
+      slides.forEach((s, k) => s.classList.toggle("on", k === i));
+      document.getElementById("pos").textContent = (i + 1) + " / " + slides.length;
+    }
+    document.getElementById("prev").onclick = () => show(i - 1);
+    document.getElementById("next").onclick = () => show(i + 1);
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowRight" || e.key === " ") show(i + 1);
+      if (e.key === "ArrowLeft") show(i - 1);
+    });
+    show(0);
+  </script>
+</body>
+</html>

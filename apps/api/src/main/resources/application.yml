@@ -1,0 +1,27 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: tongtin-api
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/tongtin}
+    username: ${DB_USER:tongtin}
+    password: ${DB_PASSWORD:tongtin}
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: false
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:tongtin-dev-secret-key-change-me-in-production-0123456789abcdef}
+    access-ttl-minutes: 30
+    refresh-ttl-days: 7
+  rate-limit:
+    register-per-hour: 20
+    login-per-15min: 30
