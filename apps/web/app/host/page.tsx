@@ -24,6 +24,7 @@ export default function HostDashboardPage() {
   const router = useRouter();
   const { language, t } = useLanguage();
   const [data, setData] = useState<Awaited<ReturnType<typeof api.getHostDashboard>> | null>(null);
+  const [subStatus, setSubStatus] = useState<Awaited<ReturnType<typeof api.getSubscriptionStatus>> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -36,10 +37,14 @@ export default function HostDashboardPage() {
     }
 
     let ignore = false;
-    api.getHostDashboard()
-      .then((res) => {
+    Promise.all([
+      api.getHostDashboard(),
+      api.getSubscriptionStatus().catch(() => null),
+    ])
+      .then(([res, sub]) => {
         if (!ignore) {
           setData(res);
+          setSubStatus(sub);
           setError(null);
           setLoading(false);
         }
@@ -126,6 +131,53 @@ export default function HostDashboardPage() {
           </Link>
         </div>
       </div>
+
+      {/* Subscription Banner */}
+      {subStatus && (
+        <div className="mt-6">
+          {subStatus.isTrial && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50/50 p-4 text-xs text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-200">
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-600 text-white font-bold">
+                  ★
+                </span>
+                <div>
+                  <span className="font-bold">Gói dùng thử 1 tháng đang hoạt động:</span> Bạn còn{" "}
+                  <span className="font-extrabold text-emerald-700 dark:text-emerald-300">
+                    {subStatus.daysRemaining} ngày
+                  </span>{" "}
+                  trải nghiệm miễn phí đầy đủ tính năng.
+                </div>
+              </div>
+              <Link
+                href="/host/subscription"
+                className="inline-flex items-center gap-1.5 font-bold text-emerald-700 hover:text-emerald-600 dark:text-emerald-300 hover:underline"
+              >
+                <span>Xem gói cước & ABA PayWay</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
+          )}
+
+          {subStatus.isExpired && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-rose-300 bg-rose-50 p-4 text-xs text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+              <div className="flex items-center gap-2.5">
+                <AlertTriangle className="h-5 w-5 text-rose-600 shrink-0" />
+                <div>
+                  <span className="font-bold">Gói dịch vụ đã hết hạn:</span> Vui lòng gia hạn hoặc nâng cấp gói để tiếp tục tạo dây hụi và vận hành.
+                </div>
+              </div>
+              <Link
+                href="/host/subscription"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-rose-600 px-3 py-1.5 font-bold text-white shadow-sm hover:bg-rose-500 transition-colors"
+              >
+                <span>Nâng cấp ngay</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* KPI Cards Grid */}
       <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">

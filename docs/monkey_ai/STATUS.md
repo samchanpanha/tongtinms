@@ -1,7 +1,7 @@
 # STATUS
 
-CURRENT_STEP: 18
-CURRENT_STEP_TITLE: Complete
+CURRENT_STEP: 19
+CURRENT_STEP_TITLE: Subscriptions & ABA PayWay Gateway
 PHASE: completed
 LAST_UPDATED: 2026-10-07
 
@@ -28,6 +28,7 @@ LAST_UPDATED: 2026-10-07
 - [x] Step 16 Hardening (audit coverage, payment idempotency, rounding, authz sweep, demo seeder)
 - [x] Step 17 Preview polish (Vietnamese UI copy first, formatMoney 1.000.000 đ, dark mode, host & member portal routes, preview allowedOrigins, start.sh, npm run build & lint clean, 119 tests pass)
 - [x] Step 18 Final delivery & wrap-up (All 10 e2e checks passed, audit verification, comprehensive README, DB clean, 18/18 steps 100% complete)
+- [x] Step 19 SaaS Subscriptions & ABA PayWay Gateway (Host registration 1-month free trial, ABA PayWay HMAC-SHA512 checkout & KHQR integration per developer.payway.com.kh, admin control panel for gateway configuration and subscription plans, Flyway V11, multilingual support)
 
 ## Step 08 acceptance (2026-10-06)
 
