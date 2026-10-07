@@ -1,5 +1,6 @@
 package com.tongtin.common.security;
 
+import com.tongtin.settings.service.SettingsService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
@@ -21,28 +22,39 @@ public class JwtService {
     private static final String REFRESH = "refresh";
 
     private final SecretKey key;
-    private final Duration accessTtl;
-    private final Duration refreshTtl;
+    private final int defaultAccessTtlMinutes;
+    private final int defaultRefreshTtlDays;
+    private final SettingsService settingsService;
 
     public JwtService(
             @Value("${app.jwt.secret}") String secret,
-            @Value("${app.jwt.access-ttl-minutes}") long accessTtlMinutes,
-            @Value("${app.jwt.refresh-ttl-days}") long refreshTtlDays) {
+            @Value("${app.jwt.access-ttl-minutes}") int accessTtlMinutes,
+            @Value("${app.jwt.refresh-ttl-days}") int refreshTtlDays,
+            SettingsService settingsService) {
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
-        this.accessTtl = Duration.ofMinutes(accessTtlMinutes);
-        this.refreshTtl = Duration.ofDays(refreshTtlDays);
+        this.defaultAccessTtlMinutes = accessTtlMinutes;
+        this.defaultRefreshTtlDays = refreshTtlDays;
+        this.settingsService = settingsService;
     }
 
     public String accessToken(Long userId, Long ownerId, List<String> roles) {
-        return token(ACCESS, userId, ownerId, roles, accessTtl);
+        return token(ACCESS, userId, ownerId, roles, accessTtl());
     }
 
     public String refreshToken(Long userId, Long ownerId, List<String> roles) {
-        return token(REFRESH, userId, ownerId, roles, refreshTtl);
+        return token(REFRESH, userId, ownerId, roles, refreshTtl());
     }
 
     public long accessTtlSeconds() {
-        return accessTtl.toSeconds();
+        return accessTtl().toSeconds();
+    }
+
+    private Duration accessTtl() {
+        return Duration.ofMinutes(settingsService.getInt("access_token_ttl_minutes", defaultAccessTtlMinutes));
+    }
+
+    private Duration refreshTtl() {
+        return Duration.ofDays(settingsService.getInt("refresh_token_ttl_days", defaultRefreshTtlDays));
     }
 
     public AuthPrincipal parse(String token) throws JwtException {

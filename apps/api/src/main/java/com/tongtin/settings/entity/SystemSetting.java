@@ -1,4 +1,4 @@
-package com.tongtin.subscription.entity;
+package com.tongtin.settings.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

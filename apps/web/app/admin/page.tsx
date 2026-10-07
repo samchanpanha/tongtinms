@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { api, AdminSetting, AdminSettingsView } from "@/lib/api";
 import { useLanguage } from "@/lib/i18n";
 import { formatMoney } from "@/lib/format";
 import {
@@ -20,16 +20,14 @@ import {
   X,
 } from "lucide-react";
 
-interface PayWaySettings {
-  merchantId: string;
-  apiKey: string;
-  apiUrl: string;
-  checkUrl: string;
-  sandboxMode: boolean;
-  enabled: boolean;
-  freeTrialDays: number;
-  gracePeriodDays: number;
-  enforceSubscription: boolean;
+function buildSettingsDraft(view: AdminSettingsView): Record<string, string> {
+  const draft: Record<string, string> = {};
+  for (const category of view.categories) {
+    for (const setting of category.settings) {
+      draft[setting.key] = setting.type === "SECRET" ? "" : setting.value ?? "";
+    }
+  }
+  return draft;
 }
 
 interface Plan {
@@ -85,13 +83,14 @@ export default function AdminPage() {
   const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<"settings" | "plans" | "hosts" | "orders">("settings");
 
-  const [settings, setSettings] = useState<PayWaySettings | null>(null);
+  const [settingsView, setSettingsView] = useState<AdminSettingsView | null>(null);
+  const [settingsDraft, setSettingsDraft] = useState<Record<string, string>>({});
+  const [savingCategory, setSavingCategory] = useState<string | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [hosts, setHosts] = useState<HostAdminView[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
 
   const [loading, setLoading] = useState(true);
-  const [savingSettings, setSavingSettings] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -110,14 +109,15 @@ export default function AdminPage() {
   useEffect(() => {
     let ignore = false;
     Promise.all([
-      api.getAdminPayWaySettings(),
+      api.getAdminSettings(),
       api.getAdminPlans(),
       api.getAdminHosts(),
       api.getAdminOrders(),
     ])
       .then(([settingsRes, plansRes, hostsRes, ordersRes]) => {
         if (!ignore) {
-          setSettings(settingsRes);
+          setSettingsView(settingsRes);
+          setSettingsDraft(buildSettingsDraft(settingsRes));
           setPlans(plansRes);
           setHosts(hostsRes);
           setOrders(ordersRes);
@@ -142,21 +142,34 @@ export default function AdminPage() {
     setRefreshKey((k) => k + 1);
   };
 
-  const handleSaveSettings = async (e: React.FormEvent) => {
+  const handleSaveCategory = async (e: React.FormEvent, categoryCode: string) => {
     e.preventDefault();
-    if (!settings) return;
-    setSavingSettings(true);
+    if (!settingsView) return;
+    const category = settingsView.categories.find((c) => c.code === categoryCode);
+    if (!category) return;
+
+    const values: Record<string, string> = {};
+    for (const setting of category.settings) {
+      const draftValue = settingsDraft[setting.key] ?? "";
+      if (setting.type === "SECRET" && draftValue === "") {
+        continue; // blank secret means "keep current value"
+      }
+      values[setting.key] = draftValue;
+    }
+
+    setSavingCategory(categoryCode);
     setError(null);
     setSuccessMsg(null);
     try {
-      const updated = await api.updateAdminPayWaySettings(settings as unknown as Record<string, unknown>);
-      setSettings(updated as unknown as PayWaySettings);
+      const updated = await api.updateAdminSettings(values);
+      setSettingsView(updated);
+      setSettingsDraft(buildSettingsDraft(updated));
       setSuccessMsg(t.admin.settingsSavedSuccess);
       setTimeout(() => setSuccessMsg(null), 3000);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to save settings");
     } finally {
-      setSavingSettings(false);
+      setSavingCategory(null);
     }
   };
 
@@ -203,6 +216,72 @@ export default function AdminPage() {
     } finally {
       setIsExtending(false);
     }
+  };
+
+  const renderSettingField = (setting: AdminSetting) => {
+    const value = settingsDraft[setting.key] ?? "";
+    const setValue = (next: string) => setSettingsDraft((prev) => ({ ...prev, [setting.key]: next }));
+
+    if (setting.type === "BOOLEAN") {
+      return (
+        <label className="flex items-center gap-2 text-xs font-medium text-zinc-700 dark:text-zinc-300 cursor-pointer md:mt-6">
+          <input
+            type="checkbox"
+            checked={value === "true"}
+            onChange={(e) => setValue(e.target.checked ? "true" : "false")}
+            className="h-4 w-4 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"
+          />
+          <span>{setting.label}</span>
+        </label>
+      );
+    }
+
+    return (
+      <>
+        <label className="flex flex-wrap items-center gap-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+          <span>{setting.label}</span>
+          {setting.type === "SECRET" && setting.configured && (
+            <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300">
+              {t.admin.configuredBadge}
+            </span>
+          )}
+          {setting.updatedAt === null && (
+            <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+              {t.admin.defaultValueBadge}
+            </span>
+          )}
+        </label>
+        <input
+          type={
+            setting.type === "INT"
+              ? "number"
+              : setting.type === "SECRET"
+                ? "password"
+                : setting.type === "URL"
+                  ? "url"
+                  : "text"
+          }
+          required={setting.type !== "SECRET"}
+          autoComplete={setting.type === "SECRET" ? "new-password" : undefined}
+          min={setting.type === "INT" ? setting.min ?? undefined : undefined}
+          max={setting.type === "INT" ? setting.max ?? undefined : undefined}
+          value={value}
+          placeholder={
+            setting.type === "SECRET" && setting.configured
+              ? t.admin.secretKeepHint
+              : setting.defaultValue ?? ""
+          }
+          onChange={(e) => setValue(e.target.value)}
+          className="mt-1.5 w-full rounded-xl border border-zinc-200 bg-zinc-50/50 p-2.5 text-xs font-mono text-zinc-900 outline-none focus:border-indigo-500 focus:bg-white dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-100"
+        />
+        <p className="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">
+          {setting.description}
+          {setting.type === "INT" && setting.min !== null && setting.max !== null
+            ? ` (${setting.min}–${setting.max})`
+            : ""}
+        </p>
+      </>
+    );
   };
 
   return (
@@ -297,146 +376,43 @@ export default function AdminPage() {
         </button>
       </div>
 
-      {/* TAB 1: ABA PayWay & System Settings */}
-      {activeTab === "settings" && settings && (
-        <form onSubmit={handleSaveSettings} className="space-y-6">
-          <div className="rounded-3xl border border-zinc-200 bg-white p-6 sm:p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 space-y-6">
-            <div>
-              <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-50 flex items-center gap-2">
-                <Settings className="h-5 w-5 text-indigo-600" />
-                {t.admin.paywayConfigTitle}
-              </h2>
-              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                {t.admin.paywayConfigSubtitle}
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* TAB 1: System Settings (settings-catalog driven) */}
+      {activeTab === "settings" && settingsView && (
+        <div className="space-y-6">
+          {settingsView.categories.map((category) => (
+            <form
+              key={category.code}
+              onSubmit={(e) => handleSaveCategory(e, category.code)}
+              className="rounded-3xl border border-zinc-200 bg-white p-6 sm:p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 space-y-6"
+            >
               <div>
-                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                  {t.admin.merchantIdLabel}
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={settings.merchantId}
-                  onChange={(e) => setSettings({ ...settings, merchantId: e.target.value })}
-                  className="mt-1.5 w-full rounded-xl border border-zinc-200 bg-zinc-50/50 p-2.5 text-xs font-mono text-zinc-900 outline-none focus:border-indigo-500 focus:bg-white dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-100"
-                />
+                <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-50 flex items-center gap-2">
+                  <Settings className="h-5 w-5 text-indigo-600" />
+                  {category.label}
+                </h2>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                  {t.admin.apiKeyLabel}
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={settings.apiKey}
-                  onChange={(e) => setSettings({ ...settings, apiKey: e.target.value })}
-                  className="mt-1.5 w-full rounded-xl border border-zinc-200 bg-zinc-50/50 p-2.5 text-xs font-mono text-zinc-900 outline-none focus:border-indigo-500 focus:bg-white dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-100"
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {category.settings.map((setting) => (
+                  <div key={setting.key} className={setting.type === "URL" ? "md:col-span-2" : ""}>
+                    {renderSettingField(setting)}
+                  </div>
+                ))}
               </div>
 
-              <div className="md:col-span-2">
-                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                  {t.admin.apiUrlLabel}
-                </label>
-                <input
-                  type="url"
-                  required
-                  value={settings.apiUrl}
-                  onChange={(e) => setSettings({ ...settings, apiUrl: e.target.value })}
-                  className="mt-1.5 w-full rounded-xl border border-zinc-200 bg-zinc-50/50 p-2.5 text-xs font-mono text-zinc-900 outline-none focus:border-indigo-500 focus:bg-white dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-100"
-                />
+              <div className="flex justify-end border-t border-zinc-100 pt-4 dark:border-zinc-800">
+                <button
+                  type="submit"
+                  disabled={savingCategory === category.code}
+                  className="flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-2.5 text-xs font-semibold text-white shadow-md hover:bg-indigo-500 disabled:opacity-50 transition-all cursor-pointer"
+                >
+                  <Save className="h-4 w-4" />
+                  <span>{savingCategory === category.code ? "Saving..." : t.admin.saveSettingsBtn}</span>
+                </button>
               </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                  {t.admin.checkUrlLabel}
-                </label>
-                <input
-                  type="url"
-                  required
-                  value={settings.checkUrl}
-                  onChange={(e) => setSettings({ ...settings, checkUrl: e.target.value })}
-                  className="mt-1.5 w-full rounded-xl border border-zinc-200 bg-zinc-50/50 p-2.5 text-xs font-mono text-zinc-900 outline-none focus:border-indigo-500 focus:bg-white dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-100"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                  {t.admin.trialDaysLabel}
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="365"
-                  value={settings.freeTrialDays}
-                  onChange={(e) => setSettings({ ...settings, freeTrialDays: Number(e.target.value) })}
-                  className="mt-1.5 w-full rounded-xl border border-zinc-200 bg-zinc-50/50 p-2.5 text-xs text-zinc-900 outline-none focus:border-indigo-500 focus:bg-white dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-100"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                  {t.admin.graceDaysLabel}
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  max="30"
-                  value={settings.gracePeriodDays}
-                  onChange={(e) => setSettings({ ...settings, gracePeriodDays: Number(e.target.value) })}
-                  className="mt-1.5 w-full rounded-xl border border-zinc-200 bg-zinc-50/50 p-2.5 text-xs text-zinc-900 outline-none focus:border-indigo-500 focus:bg-white dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-100"
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-6 border-t border-zinc-100 pt-4 dark:border-zinc-800">
-              <label className="flex items-center gap-2 text-xs font-medium text-zinc-700 dark:text-zinc-300 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={settings.sandboxMode}
-                  onChange={(e) => setSettings({ ...settings, sandboxMode: e.target.checked })}
-                  className="h-4 w-4 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"
-                />
-                <span>{t.admin.sandboxModeLabel}</span>
-              </label>
-
-              <label className="flex items-center gap-2 text-xs font-medium text-zinc-700 dark:text-zinc-300 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={settings.enabled}
-                  onChange={(e) => setSettings({ ...settings, enabled: e.target.checked })}
-                  className="h-4 w-4 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"
-                />
-                <span>{t.admin.enabledLabel}</span>
-              </label>
-
-              <label className="flex items-center gap-2 text-xs font-medium text-zinc-700 dark:text-zinc-300 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={settings.enforceSubscription}
-                  onChange={(e) => setSettings({ ...settings, enforceSubscription: e.target.checked })}
-                  className="h-4 w-4 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"
-                />
-                <span>{t.admin.enforceSubLabel}</span>
-              </label>
-            </div>
-
-            <div className="flex justify-end pt-2">
-              <button
-                type="submit"
-                disabled={savingSettings}
-                className="flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-2.5 text-xs font-semibold text-white shadow-md hover:bg-indigo-500 disabled:opacity-50 transition-all cursor-pointer"
-              >
-                <Save className="h-4 w-4" />
-                <span>{savingSettings ? "Saving..." : t.admin.saveSettingsBtn}</span>
-              </button>
-            </div>
-          </div>
-        </form>
+            </form>
+          ))}
+        </div>
       )}
 
       {/* TAB 2: Subscription Plans Manager */}

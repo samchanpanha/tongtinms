@@ -13,6 +13,7 @@ import com.tongtin.identity.repository.OwnerAccountRepository;
 import com.tongtin.identity.repository.UserRepository;
 import com.tongtin.members.repository.MemberProfileRepository;
 import com.tongtin.notify.service.NotificationService;
+import com.tongtin.settings.service.SettingsService;
 import com.tongtin.subscription.dto.ExtendSubscriptionRequest;
 import com.tongtin.subscription.dto.HostAdminViewDto;
 import com.tongtin.subscription.dto.PayWayCheckoutRequest;
@@ -23,10 +24,8 @@ import com.tongtin.subscription.dto.SubscriptionPlanDto;
 import com.tongtin.subscription.dto.SubscriptionStatusResponse;
 import com.tongtin.subscription.entity.SubscriptionOrder;
 import com.tongtin.subscription.entity.SubscriptionPlan;
-import com.tongtin.subscription.entity.SystemSetting;
 import com.tongtin.subscription.repository.SubscriptionOrderRepository;
 import com.tongtin.subscription.repository.SubscriptionPlanRepository;
-import com.tongtin.subscription.repository.SystemSettingRepository;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
@@ -47,7 +46,7 @@ public class SubscriptionService {
 
     private final SubscriptionPlanRepository planRepository;
     private final SubscriptionOrderRepository orderRepository;
-    private final SystemSettingRepository settingRepository;
+    private final SettingsService settingsService;
     private final OwnerAccountRepository ownerAccountRepository;
     private final UserRepository userRepository;
     private final GroupRepository groupRepository;
@@ -59,7 +58,7 @@ public class SubscriptionService {
     public SubscriptionService(
             SubscriptionPlanRepository planRepository,
             SubscriptionOrderRepository orderRepository,
-            SystemSettingRepository settingRepository,
+            SettingsService settingsService,
             OwnerAccountRepository ownerAccountRepository,
             UserRepository userRepository,
             GroupRepository groupRepository,
@@ -69,7 +68,7 @@ public class SubscriptionService {
             PayWayService payWayService) {
         this.planRepository = planRepository;
         this.orderRepository = orderRepository;
-        this.settingRepository = settingRepository;
+        this.settingsService = settingsService;
         this.ownerAccountRepository = ownerAccountRepository;
         this.userRepository = userRepository;
         this.groupRepository = groupRepository;
@@ -94,7 +93,7 @@ public class SubscriptionService {
         long secondsRemaining = endsAt.getEpochSecond() - now.getEpochSecond();
         long daysRemaining = Math.max(0, (secondsRemaining + 86399) / 86400);
 
-        int gracePeriodDays = Integer.parseInt(payWayService.getSetting("grace_period_days", "3"));
+        int gracePeriodDays = settingsService.getInt("grace_period_days", 3);
         Instant graceEnd = endsAt.plus(Duration.ofDays(gracePeriodDays));
 
         boolean isLifetime = "LIFETIME".equalsIgnoreCase(owner.getSubscriptionStatus());
@@ -534,37 +533,25 @@ public class SubscriptionService {
                 payWayService.getCheckUrl(),
                 payWayService.isSandbox(),
                 payWayService.isEnabled(),
-                Integer.parseInt(payWayService.getSetting("free_trial_days", "30")),
-                Integer.parseInt(payWayService.getSetting("grace_period_days", "3")),
-                Boolean.parseBoolean(payWayService.getSetting("enforce_subscription", "true"))
+                settingsService.getInt("free_trial_days", 30),
+                settingsService.getInt("grace_period_days", 3),
+                settingsService.getBoolean("enforce_subscription", true)
         );
     }
 
     @Transactional
     public PayWaySettingsDto updatePayWaySettings(Long adminUserId, PayWaySettingsDto dto) {
-        saveSetting("payway_merchant_id", dto.merchantId(), "ABA PayWay Merchant ID");
-        saveSetting("payway_api_key", dto.apiKey(), "ABA PayWay Hash/API Secret Key");
-        saveSetting("payway_api_url", dto.apiUrl(), "ABA PayWay Purchase Endpoint");
-        saveSetting("payway_check_url", dto.checkUrl(), "ABA PayWay Check Transaction Endpoint");
-        saveSetting("payway_sandbox_mode", String.valueOf(dto.sandboxMode()), "Enable Sandbox Mode");
-        saveSetting("payway_enabled", String.valueOf(dto.enabled()), "Enable PayWay Payment Gateway");
-        saveSetting("free_trial_days", String.valueOf(dto.freeTrialDays()), "Free trial duration in days");
-        saveSetting("grace_period_days", String.valueOf(dto.gracePeriodDays()), "Grace period days");
-        saveSetting("enforce_subscription", String.valueOf(dto.enforceSubscription()), "Enforce subscription limits");
-
-        auditEventRepository.save(AuditEvent.of(
-                adminUserId, "SystemSetting", "payway_config", "ADMIN_UPDATE_SETTINGS",
-                "{\"merchantId\":\"" + dto.merchantId() + "\",\"sandbox\":" + dto.sandboxMode() + "}"));
-
+        Map<String, String> values = new LinkedHashMap<>();
+        values.put("payway_merchant_id", dto.merchantId());
+        values.put("payway_api_key", dto.apiKey());
+        values.put("payway_api_url", dto.apiUrl());
+        values.put("payway_check_url", dto.checkUrl());
+        values.put("payway_sandbox_mode", String.valueOf(dto.sandboxMode()));
+        values.put("payway_enabled", String.valueOf(dto.enabled()));
+        values.put("free_trial_days", String.valueOf(dto.freeTrialDays()));
+        values.put("grace_period_days", String.valueOf(dto.gracePeriodDays()));
+        values.put("enforce_subscription", String.valueOf(dto.enforceSubscription()));
+        settingsService.update(adminUserId, values);
         return getPayWaySettings();
-    }
-
-    private void saveSetting(String key, String value, String desc) {
-        if (value == null) return;
-        SystemSetting setting = settingRepository.findById(key)
-                .orElse(new SystemSetting(key, value, desc));
-        setting.setValue(value);
-        setting.setUpdatedAt(Instant.now());
-        settingRepository.save(setting);
     }
 }

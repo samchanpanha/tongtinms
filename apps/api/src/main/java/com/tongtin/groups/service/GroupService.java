@@ -9,6 +9,7 @@ import com.tongtin.groups.dto.GroupPatchRequest;
 import com.tongtin.groups.dto.GroupResponse;
 import com.tongtin.groups.entity.Group;
 import com.tongtin.groups.repository.GroupRepository;
+import com.tongtin.settings.service.SettingsService;
 import com.tongtin.subscription.service.SubscriptionGuard;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -23,6 +24,7 @@ public class GroupService {
     private final GroupRepository groupRepository;
     private final CurrencyRepository currencyRepository;
     private final SubscriptionGuard subscriptionGuard;
+    private final SettingsService settingsService;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -30,10 +32,12 @@ public class GroupService {
     public GroupService(
             GroupRepository groupRepository,
             CurrencyRepository currencyRepository,
-            SubscriptionGuard subscriptionGuard) {
+            SubscriptionGuard subscriptionGuard,
+            SettingsService settingsService) {
         this.groupRepository = groupRepository;
         this.currencyRepository = currencyRepository;
         this.subscriptionGuard = subscriptionGuard;
+        this.settingsService = settingsService;
     }
 
     @Transactional
@@ -61,7 +65,9 @@ public class GroupService {
         group.setLateFeeType(request.lateFeeType() != null ? request.lateFeeType() : "NONE");
         group.setLateFeeValue(request.lateFeeValue() != null ? request.lateFeeValue() : 0L);
         group.setBidOpenOffset(request.bidOpenOffset() != null ? request.bidOpenOffset() : 0);
-        group.setBidCloseOffset(request.bidCloseOffset() != null ? request.bidCloseOffset() : 0);
+        group.setBidCloseOffset(request.bidCloseOffset() != null
+                ? request.bidCloseOffset()
+                : settingsService.getInt("default_bid_close_offset_days", 0));
         group.setAllowMultiShare(request.allowMultiShare() != null ? request.allowMultiShare() : true);
         validate(group);
         groupRepository.save(group);

@@ -1,5 +1,6 @@
 package com.tongtin.identity.web;
 
+import com.tongtin.settings.service.SettingsService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -18,16 +19,19 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Component
 public class AuthRateLimitFilter extends OncePerRequestFilter {
 
-    private final int registerLimit;
-    private final int loginLimit;
+    private final int defaultRegisterLimit;
+    private final int defaultLoginLimit;
+    private final SettingsService settingsService;
     private final Map<String, Window> registerWindows = new ConcurrentHashMap<>();
     private final Map<String, Window> loginWindows = new ConcurrentHashMap<>();
 
     public AuthRateLimitFilter(
             @Value("${app.rate-limit.register-per-hour}") int registerLimit,
-            @Value("${app.rate-limit.login-per-15min}") int loginLimit) {
-        this.registerLimit = registerLimit;
-        this.loginLimit = loginLimit;
+            @Value("${app.rate-limit.login-per-15min}") int loginLimit,
+            SettingsService settingsService) {
+        this.defaultRegisterLimit = registerLimit;
+        this.defaultLoginLimit = loginLimit;
+        this.settingsService = settingsService;
     }
 
     @Override
@@ -35,11 +39,17 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         String path = request.getRequestURI();
         if ("POST".equals(request.getMethod())) {
-            if (path.equals("/api/v1/auth/register-owner") && !allow(registerWindows, clientIp(request), registerLimit, Duration.ofHours(1))) {
+            if (path.equals("/api/v1/auth/register-owner")
+                    && !allow(registerWindows, clientIp(request),
+                            settingsService.getInt("rate_limit_register_per_hour", defaultRegisterLimit),
+                            Duration.ofHours(1))) {
                 reject(response, "rate limit exceeded for register");
                 return;
             }
-            if (path.equals("/api/v1/auth/login") && !allow(loginWindows, clientIp(request), loginLimit, Duration.ofMinutes(15))) {
+            if (path.equals("/api/v1/auth/login")
+                    && !allow(loginWindows, clientIp(request),
+                            settingsService.getInt("rate_limit_login_per_15min", defaultLoginLimit),
+                            Duration.ofMinutes(15))) {
                 reject(response, "rate limit exceeded for login");
                 return;
             }

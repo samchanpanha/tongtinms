@@ -48,7 +48,15 @@ com.tongtin
   ledger        formulas, obligations, payments
   notify        in-app notifications
   audit         audit events
+  subscription  plans, orders, ABA PayWay, lifecycle job
+  settings      system_settings entity, catalog registry, typed reads
 ```
+
+`settings` (Step 20) owns the `system_settings` table and the
+`SettingsCatalog` registry — the single source of truth for every runtime
+knob. Other modules read typed values through `SettingsService` and never
+touch the repository directly. `subscription` reads/writes PayWay +
+subscription keys through `SettingsService` too.
 
 Formula engine lives in `ledger` and is pure Java with no Spring in the calculator class.
 This is the most important code. Tests must match `docs/01-DOMAIN.md` examples.
@@ -109,6 +117,17 @@ notifications
 
 audit_events
   id, actor_user_id, entity_type, entity_id, action, payload_json, created_at
+
+system_settings (V11, owned by settings module)
+  key VARCHAR(100) PK, value TEXT, description TEXT, updated_at TIMESTAMPTZ
+
+subscription_plans (V11)
+  id, code unique, name, price_minor, currency CHAR(3), billing_cycle,
+  max_groups, active, created_at
+
+subscription_orders (V11)
+  id, owner_id, plan_id, tran_id unique, amount_minor, currency,
+  status, expires_at, created_at, updated_at
 ```
 
 Indexes:
@@ -120,6 +139,7 @@ Indexes:
 - groups.code unique per owner_id
 - member_profiles.phone unique per owner_id
 - money columns are BIGINT minor units; reports must select currency + exponent
+- subscription_orders.tran_id unique; idx_sub_orders_owner; idx_sub_orders_tran_id
 
 ## 5. API outline
 
@@ -330,6 +350,72 @@ Final delivery & wrap-up (Step 18) — decision 2026-10-07:
    - Payment idempotency: `Idempotency-Key` header prevents duplicate money allocation on retries.
 3. **Turnkey Operations**:
    - All-in-one root startup script (`start.sh`) managing PostgreSQL, backend API, Next.js frontend, and `--seed` demo preloading with graceful shutdown.
+
+Subscriptions & ABA PayWay (Step 19) — decision 2026-10-07 (user): host
+subscription billing via ABA PayWay checkout, admin-managed plans and
+settings. Module `com.tongtin.subscription`.
+
+Public / host:
+- GET  `/subscription/plans`            active plans (public)
+- GET  `/subscription/my-status`        own subscription status + trial/grace info
+- POST `/subscription/checkout/payway`  create order -> PayWay purchase URL
+  (tran_id `TT_<ownerId>_<uuid10>`); returns paywayUrl + fields
+- POST `/subscription/verify/{tranId}`  authoritative checkTransaction
+  (status.code 0/00 + payment_status APPROVED), activates/extend on success
+- POST `/payments/payway/callback`      provider callback (public), same
+  authoritative verification, idempotent per order status
+- POST `/payments/payway/simulate-complete` sandbox/dev helper to complete an
+  order without real bank (gated by `payway_sandbox_mode`)
+
+Admin (`/api/v1/admin`, `@PreAuthorize("hasRole('ADMIN')")`):
+- GET|POST|PUT|DELETE `/plans`          plan CRUD
+- GET  `/hosts`                         host accounts with subscription state
+- POST `/hosts/{id}/extend`             manual subscription extension
+- GET  `/orders`                        recent orders
+- GET|PUT `/settings/payway`            typed PayWay settings (legacy shape;
+  delegates to the settings module)
+
+Lifecycle: `SubscriptionLifecycleJob` runs daily 08:00 — sends expiry
+reminders at `subscription_reminder_days` (default 7/3/1), then auto-expires
+hosts past `grace_period_days` after `subscription_ends_at` (no-op when
+`enforce_subscription` is off).
+
+Settings module (Step 20) — decision 2026-10-07 (user): one centralized
+settings surface so every module's runtime configuration can be viewed and
+controlled from the admin UI. Package `com.tongtin.settings`, backed by the
+`system_settings` key/value table (V11).
+
+- `SettingsCatalog` = static registry of every known key with metadata:
+  category, label, description, type (STRING | SECRET | URL | INT | BOOLEAN |
+  INT_LIST), default value, min/max. Categories: PAYMENT, SUBSCRIPTION,
+  GROUPS, SECURITY. Adding a knob = one catalog entry, no migration (rows are
+  upserted on save; defaults live in code).
+- `SettingsService` = the only read/write path: typed getters
+  (getBoolean/getInt/getLongList/getString) that fall back to catalog
+  defaults on missing row OR malformed value (fail-safe: bad config can never
+  crash a request), grouped read view, bulk update, one audit event per save.
+- API:
+  - GET `/api/v1/admin/settings` -> grouped view
+    `{ categories:[{ code, label, settings:[{ key, label, description, type,
+    value, configured, defaultValue, min, max, updatedAt }] }] }`.
+    SECRET values are NEVER returned: `value=null` + `configured` bool.
+  - PUT `/api/v1/admin/settings` body `{ values: { key: value } }` -> upserts
+    known keys only (unknown key 400; INT out of range 400; non-bool 400;
+    URL must start http(s); INT_LIST normalized `"7, 3, 1"` -> `"7,3,1"`;
+    blank SECRET = keep existing). Writes audit event `ADMIN_UPDATE_SETTINGS`
+    with `changedKeys`, returns the fresh grouped view.
+- Runtime effect (values are read at use time, no restart):
+  - PAYMENT: PayWay merchant/api key/urls/sandbox/enabled
+  - SUBSCRIPTION: `enforce_subscription`, `free_trial_days` (trial length at
+    owner registration), `grace_period_days`, `subscription_reminder_days`
+  - GROUPS: `default_bid_close_offset_days` (group create default)
+  - SECURITY: `access_token_ttl_minutes`, `refresh_token_ttl_days` (per token
+    issuance), `rate_limit_register_per_hour`, `rate_limit_login_per_15min`
+    (per request). `app.jwt.secret` intentionally stays in env/yml only —
+    rotating a signing key is a deployment action, not an admin-UI action.
+- Admin UI: `/admin` settings tab is catalog-driven — one card per category,
+  inputs rendered per type (toggle/number/password/text), SECRET shows a
+  "configured" badge instead of the value, per-category save.
 
 ## 6. Frontend pages
 

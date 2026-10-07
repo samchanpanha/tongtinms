@@ -29,10 +29,11 @@
 | 16 | Hardening | ✅ DONE (2026-10-07) — V10 payment Idempotency-Key replay 200 / mismatch 409, audit_events on all money/winner actions, rounding boundary tests, authz sweep matrix, demo seeder (app.seed-demo=true) reproducing N=10 fixture A, 119 tests pass |
 | 17 | Preview polish | ✅ DONE (2026-10-07) — Vietnamese UI copy first (1.000.000 đ), modern web UX & dark mode, host & member portal routes, preview allowedOrigins, all-in-one start.sh, npm run build (11/11 routes) & lint 0 errors, 119 tests pass |
 | 18 | Final delivery & wrap-up | ✅ DONE (2026-10-07) — End-to-end verification (10/10 checks pass), audit trail verified, comprehensive README, all-in-one start.sh --seed, 119 tests pass |
+| 20 | Centralized settings module | ✅ DONE (2026-10-07) — catalog-driven `SettingsService` + `/api/v1/admin/settings` + admin UI (4 categories / 15 keys), 8 consumers rewired, `AdminSettingsTests` → 141 tests pass (see §8) |
 
-**Overall phase:** `completed` — planning 100%, code **18/18 steps done (100% COMPLETE)** + Step 19 subscriptions layer (see §7).
+**Overall phase:** `completed` — planning 100%, code **18/18 steps done (100% COMPLETE)** + Step 19 subscriptions layer (see §7) + Step 20 centralized settings module (see §8).
 **Blockers:** none.
-**Next action:** Post-delivery audit completed 2026-10-07 — payment-bypass vulnerabilities fixed, subscription policy consolidated, lifecycle job added. See **§7**.
+**Next action:** Post-delivery audit completed 2026-10-07 (§7); centralized settings module delivered 2026-10-07 (§8). Next candidates in §7.5.
 
 ### Easy follow steps (how to run every session)
 
@@ -357,9 +358,9 @@ Legend: `[x]` done · `[~]` current/partial · `[ ]` pending · **A** = acceptan
 
 ## 6. Immediate Next Action
 
-All roadmap steps (00–18) and the Step 19 subscriptions layer are delivered and verified.
-The post-delivery audit (2026-10-07) is complete — see **§7** for fixes, the lifecycle job,
-and the ranked roadmap of ideas analyzed but not yet implemented.
+All roadmap steps (00–18), the Step 19 subscriptions layer and the Step 20 centralized
+settings module are delivered and verified. The post-delivery audit (2026-10-07) is
+complete — see **§7** for fixes, the lifecycle job, and **§8** for the settings module.
 
 ```
 Next candidates (user picks, then doc-gate per session rules):
@@ -424,3 +425,43 @@ Next candidates (user picks, then doc-gate per session rules):
 6. **Renewal channels** — lifecycle job already emits the trigger point; Zalo/SMS/email notifier port plugs in whenever parked P3 is promoted.
 7. **Cycle-due reminders** — scheduler infra now exists (`@EnableScheduling`); requires explicit user confirmation (Step 14 decision).
 8. **Testcontainers migration** — tests currently hit the dev DB; move to isolated containers for hermetic CI.
+
+---
+
+## 8. Centralized settings module (Step 20, 2026-10-07)
+
+> Requested after the audit: *"I need all modules in setting for easy manage and control
+> configuration."* A full audit of every configuration surface (task #5) found 15 knobs
+> scattered across yml, hardcoded constants and a legacy PayWay endpoint. Step 20 implements
+> one **catalog-driven settings module** so every one of them is manageable from the admin UI
+> without a code change or a Flyway migration. Full suite after this work:
+> **141 tests, 0 failures**.
+
+### 8.1 Audit — configuration surfaces found
+
+| Area | Before Step 20 |
+|---|---|
+| ABA PayWay | merchant id / api key / purchase+check URLs / sandbox / enabled readable only via legacy `GET/PUT /admin/settings/payway`, no UI field grouping |
+| Subscription | `grace_period_days`, `enforce_subscription` applied by `SubscriptionGuard` (§7.2 #6) — settings rows existed but had no generic write path |
+| Lifecycle job | reminder days hardcoded `7/3/1` + scan horizon fixed at `+8d` |
+| Identity | free trial hardcoded 30 days; access/refresh token TTLs only in `application.yml` |
+| Auth rate limit | register/login limits only `@Value`-configurable (no runtime change) |
+| Groups | default bid-close offset hardcoded 0 |
+
+### 8.2 Implementation
+
+- **New `com.tongtin.settings` module** — `SettingsCatalog` (static registry: the single place a key is declared), `SettingDefinition` + `SettingType` (STRING/SECRET/URL/INT/BOOLEAN/INT_LIST with min/max), `SystemSetting` entity + repository over the existing `system_settings` table (V11 — **no new migration**), `SettingsService`, `AdminSettingsController` at `/api/v1/admin/settings` (ADMIN only; `GET` grouped view, `PUT {values:{key:value}}`).
+- **15 keys in 4 categories** — PAYMENT (6), SUBSCRIPTION (4: enforce_subscription, free_trial_days, grace_period_days, subscription_reminder_days), GROUPS (1: default_bid_close_offset_days), SECURITY (4: token TTLs + register/login rate limits). Adding a key needs only a catalog entry — rows are created on first save.
+- **Service semantics** — fail-safe typed reads (DB failure → catalog default; invalid stored value → fallback + warn) so bad configuration can never break a request; `update` validates per type (bool true/false, int range, URL scheme, int-list dedupe/sort), rejects unknown keys/empty payloads with 400, skips blank secrets (= keep stored), writes only changed rows and audits `ADMIN_UPDATE_SETTINGS` with changed keys.
+- **SECRET handling** — raw value never leaves the API (masked with `configured` flag); admin uses a password field with "leave blank to keep" hint.
+- **Consumers rewired to read settings live** — `PayWayService`, `SubscriptionService`, `SubscriptionGuard`, `SubscriptionLifecycleJob` (reminders + horizon), `AuthService` (trial), `GroupService` (default offset), `JwtService` (TTLs; yml stays as last-resort fallback), `AuthRateLimitFilter` (per-request limits on auth paths only).
+- **Admin UI** — `/admin` settings tab rewritten: one card per catalog category rendered from the API, per-category save, configured/default badges, secret keep-hint; i18n in 4 locales (11 dead PayWay keys removed from types + locales).
+- **Compatibility** — legacy `GET/PUT /admin/settings/payway` kept on `AdminSubscriptionController` (Step 19 tests depend on it — documented as legacy). Doc gate respected: `02-ARCHITECTURE.md` §4/§5 updated before code.
+
+### 8.3 Verification
+
+- **`AdminSettingsTests` (9 new)** — catalog grouped 4/4 + SECRET masked; anonymous 401 / host 403 / admin 200 with no secret string in the payload; 8 invalid payloads → 400 (unknown key, empty map, bad bool, int out of range, non-numeric int, bad list item, bad URL scheme, blank non-secret) + one over HTTP; normalization round-trip; **behavioral proof** — grace 5 honored by guard (endsAt −4d allowed, −6d 403), free_trial 10 drives registration expiry, default offset 5 applied on group create (explicit value still wins), reminder day 2 fires the lifecycle job, TTL 45 → login `expiresIn` 2700; blank secret keeps stored value and stays masked.
+- `mvn test` — **141 tests, 0 failures** (132 + 9). Frontend: `tsc --noEmit`, `eslint`, `npm run build` all clean.
+- Note: the live browser pass over the rewritten admin tab was **not** run this session (dev servers were blocked by the session's permission mode); UI correctness rests on build/typecheck plus the API-contract tests. A dev admin was seeded in the local dev DB (`0988999999`) for that follow-up check.
+- `plan.md` §7.5 roadmap otherwise unaffected; item 5 (admin insights) gains its settings foundation.
+

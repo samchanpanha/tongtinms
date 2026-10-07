@@ -33,6 +33,29 @@ export interface LoginResponse {
   tokens: AuthTokens;
 }
 
+export interface AdminSetting {
+  key: string;
+  label: string;
+  description: string;
+  type: "STRING" | "SECRET" | "URL" | "INT" | "BOOLEAN" | "INT_LIST";
+  value: string | null;
+  configured: boolean;
+  defaultValue: string | null;
+  min: number | null;
+  max: number | null;
+  updatedAt: string | null;
+}
+
+export interface AdminSettingCategory {
+  code: string;
+  label: string;
+  settings: AdminSetting[];
+}
+
+export interface AdminSettingsView {
+  categories: AdminSettingCategory[];
+}
+
 const TOKEN_KEY = "tongtin_access_token";
 const USER_KEY = "tongtin_auth_data";
 
@@ -683,24 +706,14 @@ export const api = {
     return request("/admin/orders");
   },
 
-  async getAdminPayWaySettings(): Promise<{
-    merchantId: string;
-    apiKey: string;
-    apiUrl: string;
-    checkUrl: string;
-    sandboxMode: boolean;
-    enabled: boolean;
-    freeTrialDays: number;
-    gracePeriodDays: number;
-    enforceSubscription: boolean;
-  }> {
-    return request("/admin/settings/payway");
+  async getAdminSettings(): Promise<AdminSettingsView> {
+    return request("/admin/settings");
   },
 
-  async updateAdminPayWaySettings(body: Record<string, unknown>) {
-    return request("/admin/settings/payway", {
+  async updateAdminSettings(values: Record<string, string>): Promise<AdminSettingsView> {
+    return request("/admin/settings", {
       method: "PUT",
-      body: JSON.stringify(body),
+      body: JSON.stringify({ values }),
     });
   },
 };

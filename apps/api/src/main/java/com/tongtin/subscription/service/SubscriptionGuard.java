@@ -4,6 +4,7 @@ import com.tongtin.common.errors.ForbiddenException;
 import com.tongtin.groups.repository.GroupRepository;
 import com.tongtin.identity.entity.OwnerAccount;
 import com.tongtin.identity.repository.OwnerAccountRepository;
+import com.tongtin.settings.service.SettingsService;
 import com.tongtin.subscription.entity.SubscriptionPlan;
 import com.tongtin.subscription.repository.SubscriptionPlanRepository;
 import java.time.Duration;
@@ -21,21 +22,21 @@ public class SubscriptionGuard {
     private final OwnerAccountRepository ownerAccountRepository;
     private final SubscriptionPlanRepository planRepository;
     private final GroupRepository groupRepository;
-    private final PayWayService payWayService;
+    private final SettingsService settingsService;
 
     public SubscriptionGuard(
             OwnerAccountRepository ownerAccountRepository,
             SubscriptionPlanRepository planRepository,
             GroupRepository groupRepository,
-            PayWayService payWayService) {
+            SettingsService settingsService) {
         this.ownerAccountRepository = ownerAccountRepository;
         this.planRepository = planRepository;
         this.groupRepository = groupRepository;
-        this.payWayService = payWayService;
+        this.settingsService = settingsService;
     }
 
     public boolean isEnforcementEnabled() {
-        return Boolean.parseBoolean(payWayService.getSetting("enforce_subscription", "true"));
+        return settingsService.getBoolean("enforce_subscription", true);
     }
 
     public void assertCanCreateGroup(Long ownerId) {
@@ -51,7 +52,7 @@ public class SubscriptionGuard {
         Instant now = Instant.now();
         Instant endsAt = owner.getSubscriptionEndsAt() != null ? owner.getSubscriptionEndsAt() : now;
         if (now.isAfter(endsAt)) {
-            int graceDays = Integer.parseInt(payWayService.getSetting("grace_period_days", "3"));
+            int graceDays = settingsService.getInt("grace_period_days", 3);
             if (now.isAfter(endsAt.plus(Duration.ofDays(graceDays)))) {
                 throw new ForbiddenException(
                         "Gói sử dụng của bạn đã hết hạn. Vui lòng gia hạn gói để tạo thêm dây hụi mới.");

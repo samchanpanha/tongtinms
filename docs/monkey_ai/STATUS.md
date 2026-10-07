@@ -1,7 +1,7 @@
 # STATUS
 
-CURRENT_STEP: 19
-CURRENT_STEP_TITLE: Subscriptions & ABA PayWay Gateway
+CURRENT_STEP: 20
+CURRENT_STEP_TITLE: Centralized Settings Module (admin-managed configuration for every module)
 PHASE: completed
 LAST_UPDATED: 2026-10-07
 
@@ -29,6 +29,7 @@ LAST_UPDATED: 2026-10-07
 - [x] Step 17 Preview polish (Vietnamese UI copy first, formatMoney 1.000.000 đ, dark mode, host & member portal routes, preview allowedOrigins, start.sh, npm run build & lint clean, 119 tests pass)
 - [x] Step 18 Final delivery & wrap-up (All 10 e2e checks passed, audit verification, comprehensive README, DB clean, 18/18 steps 100% complete)
 - [x] Step 19 SaaS Subscriptions & ABA PayWay Gateway (Host registration 1-month free trial, ABA PayWay HMAC-SHA512 checkout & KHQR integration per developer.payway.com.kh, admin control panel for gateway configuration and subscription plans, Flyway V11, multilingual support)
+- [x] Step 20 Centralized Settings Module (catalog-driven `com.tongtin.settings`: 15 keys in 4 categories over `system_settings`, ADMIN-only `/api/v1/admin/settings` GET/PUT with per-type validation + SECRET masking + audit, admin UI tab rewritten from the catalog, 8 consumers rewired to read settings live, `AdminSettingsTests` 9 new → 141 tests pass)
 
 ## Step 08 acceptance (2026-10-06)
 
@@ -373,16 +374,30 @@ LAST_UPDATED: 2026-10-07
 - [x] `plan.md` §7 records the fixes + ranked roadmap of analyzed ideas (real gateway
       return-flow wiring, `payment_events` forensics, checkout idempotency, index, ...)
 
+## Step 20 acceptance (2026-10-07)
+
+- [x] Doc gate: `02-ARCHITECTURE.md` §4/§5 updated with the `settings` module + `GET/PUT /api/v1/admin/settings` before code
+- [x] Config audit first: every configuration surface mapped (PayWay credentials, subscription policy, lifecycle reminders, trial length, token TTLs, rate limits, group default offset) — `plan.md` §8.1
+- [x] Catalog-driven design: `SettingsCatalog` = single place a key is declared (15 keys / 4 categories: PAYMENT 6, SUBSCRIPTION 4, GROUPS 1, SECURITY 4); rows created on first save — no migration per new key
+- [x] `SettingsService`: fail-safe typed reads (`getString/getBoolean/getInt/getIntList`, DB/corrupt value → catalog fallback); `update` normalizes per type (bool, int ± range, URL scheme, int-list dedupe DESC), 400 on unknown key / empty payload / invalid value; blank SECRET = keep stored; audit `ADMIN_UPDATE_SETTINGS` with changed keys
+- [x] SECRET never exposed: GET masks value + defaultValue, exposes `configured` only
+- [x] Consumers read settings live: PayWayService, SubscriptionService, SubscriptionGuard, SubscriptionLifecycleJob, AuthService (trial), GroupService (default bid-close offset), JwtService (TTLs), AuthRateLimitFilter (per-request limits)
+- [x] Admin UI: `/admin` settings tab rewritten — per-category cards from the API, per-category save, secret keep-hint, configured/default badges; i18n 4 locales (dead PayWay keys removed)
+- [x] Legacy `GET/PUT /admin/settings/payway` kept (Step 19 tests depend on it)
+- [x] `AdminSettingsTests` (9 new): grouped view 4/4 + masking; anon 401 / host 403 / admin 200 secret-free; 8 × 400 invalid payloads (+1 over HTTP); normalization; grace 5 honored by guard (−4d ok / −6d 403); free_trial 10 → registration expiry; default offset 5 applied on create; reminder day 2 → lifecycle notification; TTL 45 → login `expiresIn` 2700; blank secret unchanged
+- [x] `mvn test`: **141 tests, 0 failures** (132 + 9); frontend `tsc` + `eslint` + `npm run build` clean
+- [ ] Live browser pass over the rewritten admin tab — deferred (dev servers blocked by session permission mode); dev admin seeded in local dev DB (`0988999999`) for the follow-up check
+
 ## Next action
 
-All 19 steps delivered AND the post-delivery audit is complete (2026-10-07, `plan.md` §7).
-To run the full system with pre-seeded demo data anytime:
+All 19 steps + post-delivery audit (`plan.md` §7) + Step 20 centralized settings module (`plan.md` §8)
+are delivered (2026-10-07). To run the full system with pre-seeded demo data anytime:
 ```bash
 ./start.sh --seed
 ```
-Next improvement candidates (user picks — see `plan.md` §7.5): wire real PayWay return
-flow to `POST /subscription/verify/{tranId}`, `payment_events` forensics, checkout
-idempotency, `owner_accounts(subscription_ends_at, subscription_status)` index.
+Follow-ups: quick live pass over the new admin settings tab (dev admin `0988999999` seeded locally);
+then the ranked candidates in `plan.md` §7.5 (real PayWay return-flow wiring, `payment_events`
+forensics, checkout idempotency, owner subscription index).
 
 ## Blockers
 

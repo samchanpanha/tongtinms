@@ -1,6 +1,6 @@
-package com.tongtin.subscription.repository;
+package com.tongtin.settings.repository;
 
-import com.tongtin.subscription.entity.SystemSetting;
+import com.tongtin.settings.entity.SystemSetting;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

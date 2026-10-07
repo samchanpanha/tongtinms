@@ -2,8 +2,7 @@ package com.tongtin.subscription.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.tongtin.subscription.entity.SystemSetting;
-import com.tongtin.subscription.repository.SystemSettingRepository;
+import com.tongtin.settings.service.SettingsService;
 import java.math.BigDecimal;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -29,12 +28,12 @@ public class PayWayService {
     private static final Logger log = LoggerFactory.getLogger(PayWayService.class);
     private static final DateTimeFormatter REQ_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
-    private final SystemSettingRepository systemSettingRepository;
+    private final SettingsService settingsService;
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
 
-    public PayWayService(SystemSettingRepository systemSettingRepository, ObjectMapper objectMapper) {
-        this.systemSettingRepository = systemSettingRepository;
+    public PayWayService(SettingsService settingsService, ObjectMapper objectMapper) {
+        this.settingsService = settingsService;
         this.objectMapper = objectMapper;
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
@@ -46,9 +45,7 @@ public class PayWayService {
     }
 
     public String getSetting(String key, String defaultValue) {
-        return systemSettingRepository.findById(key)
-                .map(SystemSetting::getValue)
-                .orElse(defaultValue);
+        return settingsService.getString(key, defaultValue);
     }
 
     public String getMerchantId() {
@@ -68,11 +65,11 @@ public class PayWayService {
     }
 
     public boolean isSandbox() {
-        return Boolean.parseBoolean(getSetting("payway_sandbox_mode", "true"));
+        return settingsService.getBoolean("payway_sandbox_mode", true);
     }
 
     public boolean isEnabled() {
-        return Boolean.parseBoolean(getSetting("payway_enabled", "true"));
+        return settingsService.getBoolean("payway_enabled", true);
     }
 
     public String generateReqTime() {

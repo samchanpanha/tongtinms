@@ -15,6 +15,7 @@ import com.tongtin.identity.repository.AuditEventRepository;
 import com.tongtin.identity.repository.OwnerAccountRepository;
 import com.tongtin.identity.repository.UserRepository;
 import com.tongtin.identity.repository.UserRoleRepository;
+import com.tongtin.settings.service.SettingsService;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +36,7 @@ public class AuthService {
     private final AuditEventRepository auditEventRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final SettingsService settingsService;
 
     public AuthService(
             UserRepository userRepository,
@@ -42,13 +44,15 @@ public class AuthService {
             UserRoleRepository userRoleRepository,
             AuditEventRepository auditEventRepository,
             PasswordEncoder passwordEncoder,
-            JwtService jwtService) {
+            JwtService jwtService,
+            SettingsService settingsService) {
         this.userRepository = userRepository;
         this.ownerAccountRepository = ownerAccountRepository;
         this.userRoleRepository = userRoleRepository;
         this.auditEventRepository = auditEventRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.settingsService = settingsService;
     }
 
     @Transactional
@@ -94,9 +98,10 @@ public class AuthService {
         owner.setDisplayName(displayName);
         owner.setStatus("ACTIVE");
 
-        // 1 Month Free Trial (30 days) on host registration
+        // Free host trial; length is admin-configurable via the settings module.
+        int trialDays = settingsService.getInt("free_trial_days", 30);
         java.time.Instant now = java.time.Instant.now();
-        java.time.Instant trialEnd = now.plus(java.time.Duration.ofDays(30));
+        java.time.Instant trialEnd = now.plus(java.time.Duration.ofDays(trialDays));
         owner.setSubscriptionStatus("TRIAL");
         owner.setTrialEndsAt(trialEnd);
         owner.setSubscriptionEndsAt(trialEnd);
