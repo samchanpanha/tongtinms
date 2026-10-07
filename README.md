@@ -193,6 +193,25 @@ Hệ thống đã hoàn tất trọn vẹn **18/18 giai đoạn** theo đúng l�
 | **16** | **Hardening** | Sổ kiểm toán (`audit_events`), Idempotency Key (Flyway V10), kiểm thử bảo mật & Demo Seeder |
 | **17** | **Preview Polish** | Giao diện tiếng Việt chuẩn mực, định dạng `1.000.000 đ`, Dark Mode, 11 routes, `start.sh` |
 | **18** | **Final Delivery** | Kiểm thử đầu cuối (E2E) trọn vẹn 10 quy trình, tài liệu hướng dẫn và hoàn tất chuyển giao |
+| **19** | **SaaS Subscriptions & ABA PayWay** | Tặng 1 tháng dùng thử miễn phí khi đăng ký Chủ Hụi, tích hợp cổng thanh toán ABA PayWay (HMAC-SHA512 KHQR & Card theo [developer.payway.com.kh](https://developer.payway.com.kh/)), cấu hình gói cước và quản trị hệ thống qua Admin Panel (Flyway V11) |
+
+---
+
+## 💳 Tích Hợp Cổng Thanh Toán ABA PayWay & Gói Cước SaaS (Step 19)
+
+Hệ thống hỗ trợ mô hình kinh doanh phần mềm dịch vụ (SaaS) toàn diện:
+- **Tự Động Tặng 1 Tháng Dùng Thử**: Khi Chủ Hụi đăng ký mới, hệ thống tự động kích hoạt 30 ngày dùng thử miễn phí (`TRIAL`), theo dõi số ngày còn lại và hiển thị cảnh báo gia hạn khi hết hạn.
+- **Tích Hợp Cổng Thanh Toán ABA PayWay**:
+  - Tuân thủ đặc tả kỹ thuật chính thức tại [developer.payway.com.kh](https://developer.payway.com.kh/).
+  - Mã hóa bảo mật chữ ký điện tử HMAC-SHA512.
+  - Hỗ trợ thanh toán nhanh qua **ABA Pay KHQR** (Bakong) và thẻ quốc tế Visa/Mastercard/JCB.
+  - Cơ chế Webhook Callback, tra cứu giao dịch và mô phỏng thanh toán Sandbox phục vụ kiểm thử.
+- **Trung Tâm Quản Trị Hệ Thống (Administrator Control Panel)**:
+  - Truy cập tại `/admin` dành riêng cho vai trò `ADMIN` (`0900999999` / `admin1234`).
+  - Cấu hình thông số Merchant ID, API Hash Key, Purchase URL, Check URL, Sandbox Mode.
+  - Quản trị danh mục gói cước đăng ký (Thêm, Sửa, Xóa, Bật/Tắt, Định giá theo USD/KHR/VND).
+  - Quản lý danh sách Chủ Hụi và gia hạn gói dịch vụ thủ công (+30 ngày, +1 năm, VIP vĩnh viễn).
+  - Sổ nhật ký giao dịch thanh toán PayWay thời gian thực.
 
 ---
 

@@ -43,6 +43,21 @@ public class OwnerAccount {
     @Column(name = "city")
     private String city;
 
+    @Column(name = "default_currency", nullable = false)
+    private String defaultCurrency = "VND";
+
+    @Column(name = "subscription_status", nullable = false)
+    private String subscriptionStatus = "TRIAL";
+
+    @Column(name = "trial_ends_at", nullable = false)
+    private Instant trialEndsAt;
+
+    @Column(name = "subscription_ends_at", nullable = false)
+    private Instant subscriptionEndsAt;
+
+    @Column(name = "current_plan_id")
+    private Long currentPlanId;
+
     @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
     private Instant createdAt;
 
@@ -120,6 +135,46 @@ public class OwnerAccount {
 
     public void setCity(String city) {
         this.city = city;
+    }
+
+    public String getDefaultCurrency() {
+        return defaultCurrency;
+    }
+
+    public void setDefaultCurrency(String defaultCurrency) {
+        this.defaultCurrency = defaultCurrency;
+    }
+
+    public String getSubscriptionStatus() {
+        return subscriptionStatus;
+    }
+
+    public void setSubscriptionStatus(String subscriptionStatus) {
+        this.subscriptionStatus = subscriptionStatus;
+    }
+
+    public Instant getTrialEndsAt() {
+        return trialEndsAt;
+    }
+
+    public void setTrialEndsAt(Instant trialEndsAt) {
+        this.trialEndsAt = trialEndsAt;
+    }
+
+    public Instant getSubscriptionEndsAt() {
+        return subscriptionEndsAt;
+    }
+
+    public void setSubscriptionEndsAt(Instant subscriptionEndsAt) {
+        this.subscriptionEndsAt = subscriptionEndsAt;
+    }
+
+    public Long getCurrentPlanId() {
+        return currentPlanId;
+    }
+
+    public void setCurrentPlanId(Long currentPlanId) {
+        this.currentPlanId = currentPlanId;
     }
 
     public Instant getCreatedAt() {

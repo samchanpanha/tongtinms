@@ -22,7 +22,9 @@ export default function LoginPage() {
 
     try {
       const res = await api.login(phone.trim(), password);
-      if (res.roles.includes("HOST")) {
+      if (res.roles.includes("ADMIN")) {
+        router.push("/admin");
+      } else if (res.roles.includes("HOST")) {
         router.push("/host");
       } else {
         router.push("/app");
@@ -43,6 +45,12 @@ export default function LoginPage() {
   const fillDemoMember = () => {
     setPhone("0900100001");
     setPassword("demo1234");
+    setError(null);
+  };
+
+  const fillDemoAdmin = () => {
+    setPhone("0900999999");
+    setPassword("admin1234");
     setError(null);
   };
 
@@ -67,20 +75,27 @@ export default function LoginPage() {
             <Sparkles className="h-3.5 w-3.5" />
             {t.login.demoFastLogin}
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <button
               type="button"
               onClick={fillDemoHost}
-              className="rounded-lg border border-emerald-300/80 bg-white px-2.5 py-1.5 text-xs font-medium text-emerald-800 hover:bg-emerald-50 dark:border-emerald-800 dark:bg-zinc-800 dark:text-emerald-200 transition-colors text-center cursor-pointer"
+              className="rounded-lg border border-emerald-300/80 bg-white px-2 py-1.5 text-xs font-medium text-emerald-800 hover:bg-emerald-50 dark:border-emerald-800 dark:bg-zinc-800 dark:text-emerald-200 transition-colors text-center cursor-pointer"
             >
               {t.login.demoHost}
             </button>
             <button
               type="button"
               onClick={fillDemoMember}
-              className="rounded-lg border border-emerald-300/80 bg-white px-2.5 py-1.5 text-xs font-medium text-emerald-800 hover:bg-emerald-50 dark:border-emerald-800 dark:bg-zinc-800 dark:text-emerald-200 transition-colors text-center cursor-pointer"
+              className="rounded-lg border border-emerald-300/80 bg-white px-2 py-1.5 text-xs font-medium text-emerald-800 hover:bg-emerald-50 dark:border-emerald-800 dark:bg-zinc-800 dark:text-emerald-200 transition-colors text-center cursor-pointer"
             >
               {t.login.demoMember}
+            </button>
+            <button
+              type="button"
+              onClick={fillDemoAdmin}
+              className="rounded-lg border border-indigo-300/80 bg-white px-2 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 dark:border-indigo-800 dark:bg-zinc-800 dark:text-indigo-300 transition-colors text-center cursor-pointer"
+            >
+              Admin Quản Trị
             </button>
           </div>
         </div>

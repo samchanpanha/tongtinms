@@ -63,6 +63,8 @@ public class DemoSeeder implements CommandLineRunner {
     private final CycleCloseService cycleCloseService;
     private final UserRepository userRepository;
     private final OwnerAccountRepository ownerAccountRepository;
+    private final com.tongtin.identity.repository.UserRoleRepository userRoleRepository;
+    private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
     public DemoSeeder(AuthService authService,
                       MemberService memberService,
@@ -72,7 +74,9 @@ public class DemoSeeder implements CommandLineRunner {
                       BidService bidService,
                       CycleCloseService cycleCloseService,
                       UserRepository userRepository,
-                      OwnerAccountRepository ownerAccountRepository) {
+                      OwnerAccountRepository ownerAccountRepository,
+                      com.tongtin.identity.repository.UserRoleRepository userRoleRepository,
+                      org.springframework.security.crypto.password.PasswordEncoder passwordEncoder) {
         this.authService = authService;
         this.memberService = memberService;
         this.groupService = groupService;
@@ -82,10 +86,26 @@ public class DemoSeeder implements CommandLineRunner {
         this.cycleCloseService = cycleCloseService;
         this.userRepository = userRepository;
         this.ownerAccountRepository = ownerAccountRepository;
+        this.userRoleRepository = userRoleRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Override
     public void run(String... args) {
+        // Seed Administrator if not exists
+        String adminPhone = com.tongtin.common.util.PhoneUtil.normalize("0900999999");
+        if (!userRepository.existsByPhone(adminPhone)) {
+            User admin = new User();
+            admin.setPhone(adminPhone);
+            admin.setFullName("Super Administrator");
+            admin.setEmail("admin@tongtin.app");
+            admin.setPasswordHash(passwordEncoder.encode("admin1234"));
+            admin.setStatus("ACTIVE");
+            userRepository.saveAndFlush(admin);
+            userRoleRepository.save(new com.tongtin.identity.entity.UserRole(admin.getId(), "ADMIN"));
+            log.info("Demo Administrator seeded: phone={}, password=admin1234", adminPhone);
+        }
+
         try {
             authService.registerOwner(new RegisterOwnerRequest(
                     "Chu Hoi Demo", DEMO_HOST_PHONE, "demo1234", "demo1234", null, null, true));

@@ -93,6 +93,14 @@ public class AuthService {
                 : request.displayName().trim();
         owner.setDisplayName(displayName);
         owner.setStatus("ACTIVE");
+
+        // 1 Month Free Trial (30 days) on host registration
+        java.time.Instant now = java.time.Instant.now();
+        java.time.Instant trialEnd = now.plus(java.time.Duration.ofDays(30));
+        owner.setSubscriptionStatus("TRIAL");
+        owner.setTrialEndsAt(trialEnd);
+        owner.setSubscriptionEndsAt(trialEnd);
+
         ownerAccountRepository.save(owner);
 
         auditEventRepository.save(AuditEvent.of(
@@ -227,6 +235,11 @@ public class AuthService {
         view.put("accountHolder", owner.getAccountHolder());
         view.put("zalo", owner.getZalo());
         view.put("city", owner.getCity());
+        view.put("defaultCurrency", owner.getDefaultCurrency());
+        view.put("subscriptionStatus", owner.getSubscriptionStatus());
+        view.put("trialEndsAt", owner.getTrialEndsAt() != null ? owner.getTrialEndsAt().toString() : null);
+        view.put("subscriptionEndsAt", owner.getSubscriptionEndsAt() != null ? owner.getSubscriptionEndsAt().toString() : null);
+        view.put("currentPlanId", owner.getCurrentPlanId());
         return view;
     }
 

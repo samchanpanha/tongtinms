@@ -51,6 +51,7 @@ export function Navbar() {
 
   const isHost = auth?.roles.includes("HOST");
   const isMember = auth?.roles.includes("MEMBER");
+  const isAdmin = auth?.roles.includes("ADMIN");
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-zinc-200 bg-white/80 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-950/80">
@@ -96,6 +97,17 @@ export function Navbar() {
                     <Users className="h-4 w-4" />
                     {t.navbar.members}
                   </Link>
+                  <Link
+                    href="/host/subscription"
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                      pathname === "/host/subscription"
+                        ? "bg-emerald-100 text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-200"
+                        : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
+                    }`}
+                  >
+                    <Wallet className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                    <span>{t.navbar.subscription}</span>
+                  </Link>
                 </>
               )}
               {isMember && (
@@ -109,6 +121,19 @@ export function Navbar() {
                 >
                   <Wallet className="h-4 w-4" />
                   {t.navbar.myGroups}
+                </Link>
+              )}
+              {isAdmin && (
+                <Link
+                  href="/admin"
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
+                    pathname.startsWith("/admin")
+                      ? "bg-indigo-100 text-indigo-900 dark:bg-indigo-950/80 dark:text-indigo-200"
+                      : "text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-200"
+                  }`}
+                >
+                  <Shield className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                  <span>{t.navbar.adminPortal}</span>
                 </Link>
               )}
             </nav>
@@ -151,7 +176,7 @@ export function Navbar() {
               <div className="hidden sm:flex flex-col items-end text-xs">
                 <span className="font-semibold text-zinc-900 dark:text-zinc-50">{auth.user.fullName}</span>
                 <span className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                  {isHost ? t.navbar.roleHost : t.navbar.roleMember} • {auth.user.phone}
+                  {isAdmin ? t.navbar.roleAdmin : isHost ? t.navbar.roleHost : t.navbar.roleMember} • {auth.user.phone}
                 </span>
               </div>
 

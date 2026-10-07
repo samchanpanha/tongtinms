@@ -21,17 +21,35 @@ public class GroupService {
 
     private final GroupRepository groupRepository;
     private final CurrencyRepository currencyRepository;
+    private final com.tongtin.identity.repository.OwnerAccountRepository ownerAccountRepository;
 
     @PersistenceContext
     private EntityManager entityManager;
 
-    public GroupService(GroupRepository groupRepository, CurrencyRepository currencyRepository) {
+    public GroupService(
+            GroupRepository groupRepository,
+            CurrencyRepository currencyRepository,
+            com.tongtin.identity.repository.OwnerAccountRepository ownerAccountRepository) {
         this.groupRepository = groupRepository;
         this.currencyRepository = currencyRepository;
+        this.ownerAccountRepository = ownerAccountRepository;
     }
 
     @Transactional
     public GroupResponse create(Long ownerId, GroupCreateRequest request) {
+        OwnerAccount owner = ownerAccountRepository.findById(ownerId).orElse(null);
+        if (owner != null) {
+            java.time.Instant now = java.time.Instant.now();
+            boolean isLifetime = "LIFETIME".equalsIgnoreCase(owner.getSubscriptionStatus());
+            if (!isLifetime) {
+                java.time.Instant endsAt = owner.getSubscriptionEndsAt() != null ? owner.getSubscriptionEndsAt() : now;
+                java.time.Instant graceEnd = endsAt.plus(java.time.Duration.ofDays(3));
+                if (now.isAfter(graceEnd)) {
+                    throw new com.tongtin.common.errors.ForbiddenException("Gói sử dụng của bạn đã hết hạn. Vui lòng nâng cấp gói để tạo thêm dây hụi mới.");
+                }
+            }
+        }
+
         Group group = new Group();
         group.setOwnerId(ownerId);
         group.setCode(nextCode(ownerId));

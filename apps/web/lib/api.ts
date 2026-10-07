@@ -483,4 +483,224 @@ export const api = {
   async markAllNotificationsRead() {
     return request<{ updatedCount: number }>("/notifications/read-all", { method: "POST" });
   },
+
+  // Subscription & ABA PayWay
+  async getSubscriptionStatus(): Promise<{
+    ownerId: number;
+    displayName: string;
+    subscriptionStatus: string;
+    trialEndsAt: string;
+    subscriptionEndsAt: string;
+    daysRemaining: number;
+    isTrial: boolean;
+    isGracePeriod: boolean;
+    isExpired: boolean;
+    canCreateGroup: boolean;
+    currentPlan: {
+      id: number;
+      code: string;
+      name: string;
+      description: string;
+      priceMinor: number;
+      currency: string;
+      durationMonths: number;
+      maxGroups: number;
+      maxMembers: number;
+      featuresJson: string;
+      badge: string;
+      sortOrder: number;
+      isActive: boolean;
+    } | null;
+    groupsCount: number;
+    maxGroups: number;
+    membersCount: number;
+    maxMembers: number;
+  }> {
+    return request("/subscription/my-status");
+  },
+
+  async getSubscriptionPlans(): Promise<Array<{
+    id: number;
+    code: string;
+    name: string;
+    description: string;
+    priceMinor: number;
+    currency: string;
+    durationMonths: number;
+    maxGroups: number;
+    maxMembers: number;
+    featuresJson: string;
+    badge: string;
+    sortOrder: number;
+    isActive: boolean;
+  }>> {
+    return request("/subscription/plans");
+  },
+
+  async checkoutPayWay(planId: number, paymentOption?: string, returnUrl?: string) {
+    return request<{
+      tranId: string;
+      reqTime: string;
+      merchantId: string;
+      amount: string;
+      currency: string;
+      itemsBase64: string;
+      hash: string;
+      checkoutUrl: string;
+      paymentOption: string;
+      returnUrl: string;
+      continueSuccessUrl: string;
+      cancelUrl: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+      phone: string;
+      qrString: string;
+      formFields: Record<string, string>;
+    }>("/subscription/checkout/payway", {
+      method: "POST",
+      body: JSON.stringify({ planId, paymentOption, returnUrl }),
+    });
+  },
+
+  async verifySubscriptionOrder(tranId: string) {
+    return request<{
+      id: number;
+      tranId: string;
+      status: string;
+      amountMinor: number;
+      currency: string;
+      paidAt: string;
+    }>(`/subscription/verify/${tranId}`, {
+      method: "POST",
+    });
+  },
+
+  async simulatePayWayPayment(tranId: string) {
+    return request<{ status: number; message: string; tranId: string; orderStatus: string }>(
+      "/payments/payway/simulate-complete",
+      {
+        method: "POST",
+        body: JSON.stringify({ tranId }),
+      }
+    );
+  },
+
+  async getSubscriptionInvoices(): Promise<Array<{
+    id: number;
+    tranId: string;
+    planId: number;
+    amountMinor: number;
+    currency: string;
+    status: string;
+    paymentGateway: string;
+    paidAt: string | null;
+    createdAt: string;
+  }>> {
+    return request("/subscription/invoices");
+  },
+
+  // Admin APIs
+  async getAdminPlans(): Promise<Array<{
+    id: number;
+    code: string;
+    name: string;
+    description: string;
+    priceMinor: number;
+    currency: string;
+    durationMonths: number;
+    maxGroups: number;
+    maxMembers: number;
+    featuresJson: string;
+    badge: string;
+    sortOrder: number;
+    isActive: boolean;
+  }>> {
+    return request("/admin/plans");
+  },
+
+  async createAdminPlan(body: Record<string, unknown>) {
+    return request("/admin/plans", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  },
+
+  async updateAdminPlan(id: number, body: Record<string, unknown>) {
+    return request(`/admin/plans/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    });
+  },
+
+  async deleteAdminPlan(id: number) {
+    return request(`/admin/plans/${id}`, {
+      method: "DELETE",
+    });
+  },
+
+  async getAdminHosts(): Promise<Array<{
+    ownerId: number;
+    userId: number;
+    fullName: string;
+    phone: string;
+    email: string | null;
+    displayName: string;
+    subscriptionStatus: string;
+    trialEndsAt: string;
+    subscriptionEndsAt: string;
+    daysRemaining: number;
+    currentPlanId: number | null;
+    currentPlanName: string;
+    groupsCount: number;
+    membersCount: number;
+    registeredAt: string;
+  }>> {
+    return request("/admin/hosts");
+  },
+
+  async extendHostSubscription(ownerId: number, body: { extendDays: number; planId?: number; reason?: string; setLifetime?: boolean }) {
+    return request(`/admin/hosts/${ownerId}/extend`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  },
+
+  async getAdminOrders(): Promise<Array<{
+    id: number;
+    ownerId: number;
+    planId: number;
+    tranId: string;
+    amountMinor: number;
+    currency: string;
+    status: string;
+    paymentGateway: string;
+    gatewayTranId: string | null;
+    reqTime: string;
+    paidAt: string | null;
+    createdAt: string;
+  }>> {
+    return request("/admin/orders");
+  },
+
+  async getAdminPayWaySettings(): Promise<{
+    merchantId: string;
+    apiKey: string;
+    apiUrl: string;
+    checkUrl: string;
+    sandboxMode: boolean;
+    enabled: boolean;
+    freeTrialDays: number;
+    gracePeriodDays: number;
+    enforceSubscription: boolean;
+  }> {
+    return request("/admin/settings/payway");
+  },
+
+  async updateAdminPayWaySettings(body: Record<string, unknown>) {
+    return request("/admin/settings/payway", {
+      method: "PUT",
+      body: JSON.stringify(body),
+    });
+  },
 };
