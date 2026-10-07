@@ -30,9 +30,9 @@
 | 17 | Preview polish | ✅ DONE (2026-10-07) — Vietnamese UI copy first (1.000.000 đ), modern web UX & dark mode, host & member portal routes, preview allowedOrigins, all-in-one start.sh, npm run build (11/11 routes) & lint 0 errors, 119 tests pass |
 | 18 | Final delivery & wrap-up | ✅ DONE (2026-10-07) — End-to-end verification (10/10 checks pass), audit trail verified, comprehensive README, all-in-one start.sh --seed, 119 tests pass |
 
-**Overall phase:** `completed` — planning 100%, code **18/18 steps done (100% COMPLETE)**.
+**Overall phase:** `completed` — planning 100%, code **18/18 steps done (100% COMPLETE)** + Step 19 subscriptions layer (see §7).
 **Blockers:** none.
-**Next action:** System fully delivered! Launch anytime with `./start.sh --seed`.
+**Next action:** Post-delivery audit completed 2026-10-07 — payment-bypass vulnerabilities fixed, subscription policy consolidated, lifecycle job added. See **§7**.
 
 ### Easy follow steps (how to run every session)
 
@@ -357,11 +357,70 @@ Legend: `[x]` done · `[~]` current/partial · `[ ]` pending · **A** = acceptan
 
 ## 6. Immediate Next Action
 
-STATUS says: when the user says to continue, execute **Step 15 only** —
+All roadmap steps (00–18) and the Step 19 subscriptions layer are delivered and verified.
+The post-delivery audit (2026-10-07) is complete — see **§7** for fixes, the lifecycle job,
+and the ranked roadmap of ideas analyzed but not yet implemented.
 
 ```
-Step 15 — Reports: host profit, member statement, cycle public summary; money
-payload {"currency","amountMinor","exponent","symbol"}; formula version shown.
-OPEN QUESTION first: which reports / formats (JSON/CSV) / endpoints — confirm
-scope with user, then doc-gate §5.
+Next candidates (user picks, then doc-gate per session rules):
+1. Frontend: wire real ABA PayWay return -> POST /subscription/verify/{tranId}
+2. payment_events forensics table + callback rate limit
+3. Checkout idempotency (reuse PENDING order per owner+plan)
+4. owner_accounts(subscription_ends_at, subscription_status) index
 ```
+
+---
+
+## 7. Post-delivery audit & SaaS hardening (2026-10-07)
+
+> Audit requested after Step 19 (Subscriptions & ABA PayWay). The suite was green and the
+> demo worked, but the audit found **real payment-bypass vulnerabilities** and several
+> policy/perf defects. This section is the record of what was fixed, what was added, and
+> what is worth doing next. Full suite after this work: **132 tests, 0 failures**.
+
+### 7.1 Critical fixes — payment security
+
+| # | Issue found | Fix |
+|---|---|---|
+| 1 | `POST /payments/payway/simulate-complete` activated any order with zero payment, in every mode | 403 unless `payway_sandbox_mode = true` (`PayWayCallbackController`) |
+| 2 | Public webhook `/payments/payway/callback` trusted URL query params (`status`, `amount`) | Callback never activates from params: authoritative ABA **check-transaction** (HMAC-SHA512) must return `status.code=0/00` + `payment_status=APPROVED` (`PayWayService.checkTransaction` → `SubscriptionService.verifyAndActivateViaGateway`) |
+| 3 | `POST /subscription/verify/{tranId}` lacked order-ownership check — any host could activate another host's order | `verifyOrderForOwner` enforces `order.ownerId == principal.ownerId`, else 403 |
+| 4 | `tran_id` was time-modulo guessable (`nowMs % 1e9`) | `TT_<ownerId>_<uuid10>` (random UUID suffix) |
+| 5 | Checkout worked even with `payway_enabled = false` | `checkoutPayWay` throws 400 when gateway disabled |
+
+### 7.2 Policy & correctness fixes
+
+| # | Issue | Fix |
+|---|---|---|
+| 6 | Grace period hardcoded to 3 days in group creation; `grace_period_days` setting, `enforce_subscription` switch and plan `max_groups` were never applied | New `SubscriptionGuard` = single policy point (reads settings); `GroupService.create` delegates; plan group-limit now enforced |
+| 7 | `PayWayService.formatAmount` converted minor units via `DecimalFormat`/`double` | `BigDecimal.valueOf(amountMinor, exponent).toPlainString()` — zero-float invariant (§1.3 #1) holds on the payment path |
+| 8 | CORS `allowedHeaders` omitted `Idempotency-Key` — Step 16 idempotency replays broke from the Next.js origin | Header allowed in `SecurityConfig` |
+| 9 | Subscription status/admin hosts list loaded *all* groups via `findAll()` to count per owner | `GroupRepository.countByOwnerId` count query |
+| 10 | Compile breakage found during audit (OwnerAccount import, member count query, NotificationService rename) | Fixed; suite green again |
+
+### 7.3 Improvement implemented — subscription lifecycle job
+
+- **`SubscriptionLifecycleJob`** (`com.tongtin.subscription.service`) + `@EnableScheduling`:
+  - Daily 08:00 (`@Scheduled(cron = "0 0 8 * * *")`); skipped entirely when `enforce_subscription = false`.
+  - **Reminders** `SUBSCRIPTION_EXPIRING` at 7 / 3 / 1 days remaining.
+  - **Auto-expire** owners past `subscription_ends_at + grace_period_days`: `subscription_status → EXPIRED` + `SUBSCRIPTION_EXPIRED` notification; never re-expires or re-notifies (EXPIRED owners excluded from the candidate query).
+  - Single bounded query: `OwnerAccountRepository.findBySubscriptionEndsAtBeforeAndSubscriptionStatusNotIn(now+8d, [EXPIRED, LIFETIME])`.
+  - Scope note: this is **host-billing** notification. Step 14's "sync transitions only" decision for *member group events* still stands — no group scheduler was added.
+- **Test**: `SubscriptionAndPayWayTests.testSubscriptionLifecycleJob` — reminder at 7d, auto-expiry after grace, no re-expiry on later runs, enforcement-off no-op. Class now 13 tests (all green).
+
+### 7.4 Verification
+
+- `mvn test` — **132 tests, 0 failures** (119 base + 7 Step 19 + 5 new security tests + 1 lifecycle test).
+- Frontend untouched by these changes; sandbox demo flow (`payway_sandbox_mode = true` default) unaffected.
+- Live behavior confirmed in test logs: gateway check rejects unknown `tran_id`, order stays PENDING, owner stays TRIAL.
+
+### 7.5 Roadmap — analyzed, NOT yet implemented (ranked)
+
+1. **Real gateway return flow (frontend)** — `/host/subscription` currently completes only via sandbox simulate. Wire the ABA PayWay redirect return (or `return_params`) to `POST /subscription/verify/{tranId}` (endpoint now exists, owner-scoped and gateway-verified) so production checkout completes end-to-end.
+2. **Payment forensics + abuse control** — append-only `payment_events` table storing raw callback/check-transaction payloads; rate-limit the public callback endpoint.
+3. **Checkout idempotency** — reuse/confirm a PENDING order per (owner, plan) within a time window to prevent double-click duplicate orders.
+4. **Index** `owner_accounts(subscription_ends_at, subscription_status)` when host count grows (lifecycle-job scan).
+5. **Admin insights** — revenue per plan, churn/cohort view on the admin hosts list.
+6. **Renewal channels** — lifecycle job already emits the trigger point; Zalo/SMS/email notifier port plugs in whenever parked P3 is promoted.
+7. **Cycle-due reminders** — scheduler infra now exists (`@EnableScheduling`); requires explicit user confirmation (Step 14 decision).
+8. **Testcontainers migration** — tests currently hit the dev DB; move to isolated containers for hermetic CI.

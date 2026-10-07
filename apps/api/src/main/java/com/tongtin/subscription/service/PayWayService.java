@@ -1,15 +1,22 @@
 package com.tongtin.subscription.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tongtin.subscription.entity.SystemSetting;
 import com.tongtin.subscription.repository.SystemSettingRepository;
+import java.math.BigDecimal;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
-import java.text.DecimalFormat;
-import java.text.DecimalFormatSymbols;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Base64;
-import java.util.Locale;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.slf4j.Logger;
@@ -23,9 +30,19 @@ public class PayWayService {
     private static final DateTimeFormatter REQ_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
     private final SystemSettingRepository systemSettingRepository;
+    private final ObjectMapper objectMapper;
+    private final HttpClient httpClient;
 
-    public PayWayService(SystemSettingRepository systemSettingRepository) {
+    public PayWayService(SystemSettingRepository systemSettingRepository, ObjectMapper objectMapper) {
         this.systemSettingRepository = systemSettingRepository;
+        this.objectMapper = objectMapper;
+        this.httpClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(10))
+                .build();
+    }
+
+    /** Result of an authoritative Check-Transaction call against ABA PayWay. */
+    public record TransactionCheck(boolean approved, String gatewayTranId, String rawJson) {
     }
 
     public String getSetting(String key, String defaultValue) {
@@ -71,11 +88,55 @@ public class PayWayService {
 
         if (exponent == 0) {
             return String.valueOf(amountMinor);
-        } else {
-            double value = (double) amountMinor / Math.pow(10, exponent);
-            DecimalFormatSymbols symbols = new DecimalFormatSymbols(Locale.US);
-            DecimalFormat df = new DecimalFormat("0.00", symbols);
-            return df.format(value);
+        }
+        return BigDecimal.valueOf(amountMinor, exponent).toPlainString();
+    }
+
+    /**
+     * Authoritative verification: asks ABA PayWay (check-transaction API) whether the order
+     * was actually paid. Callers must never activate a subscription based on a callback's
+     * URL parameters alone — only on this response.
+     */
+    public TransactionCheck checkTransaction(String reqTime, String merchantId, String tranId) {
+        if (reqTime == null || reqTime.isBlank() || tranId == null || tranId.isBlank()) {
+            return new TransactionCheck(false, null, "{\"error\":\"missing req_time or tran_id\"}");
+        }
+        String hash = generateCheckTransactionHash(reqTime, merchantId, tranId);
+
+        Map<String, String> payload = new LinkedHashMap<>();
+        payload.put("req_time", reqTime);
+        payload.put("merchant_id", merchantId);
+        payload.put("tran_id", tranId);
+        payload.put("hash", hash);
+
+        try {
+            HttpRequest request = HttpRequest.newBuilder(URI.create(getCheckUrl()))
+                    .timeout(Duration.ofSeconds(15))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200) {
+                log.warn("PayWay check-transaction returned HTTP {} for {}", response.statusCode(), tranId);
+                return new TransactionCheck(false, null, response.body());
+            }
+
+            JsonNode root = objectMapper.readTree(response.body());
+            String code = root.path("status").path("code").asText("");
+            String paymentStatus = root.path("data").path("payment_status").asText("");
+            String gatewayTranId = root.path("data").path("tran_id").asText(tranId);
+
+            boolean statusOk = "0".equals(code) || "00".equals(code);
+            boolean approved = statusOk && "APPROVED".equalsIgnoreCase(paymentStatus);
+            if (!approved) {
+                log.info("PayWay check-transaction NOT approved for {}: status.code={}, payment_status={}",
+                        tranId, code, paymentStatus);
+            }
+            return new TransactionCheck(approved, gatewayTranId, response.body());
+        } catch (Exception e) {
+            log.error("PayWay check-transaction failed for {}: {}", tranId, e.getMessage());
+            return new TransactionCheck(false, null, "{\"error\":\"" + e.getClass().getSimpleName() + "\"}");
         }
     }
 

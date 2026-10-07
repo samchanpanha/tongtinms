@@ -9,6 +9,7 @@ import com.tongtin.groups.dto.GroupPatchRequest;
 import com.tongtin.groups.dto.GroupResponse;
 import com.tongtin.groups.entity.Group;
 import com.tongtin.groups.repository.GroupRepository;
+import com.tongtin.subscription.service.SubscriptionGuard;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.time.Year;
@@ -21,7 +22,7 @@ public class GroupService {
 
     private final GroupRepository groupRepository;
     private final CurrencyRepository currencyRepository;
-    private final com.tongtin.identity.repository.OwnerAccountRepository ownerAccountRepository;
+    private final SubscriptionGuard subscriptionGuard;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -29,26 +30,15 @@ public class GroupService {
     public GroupService(
             GroupRepository groupRepository,
             CurrencyRepository currencyRepository,
-            com.tongtin.identity.repository.OwnerAccountRepository ownerAccountRepository) {
+            SubscriptionGuard subscriptionGuard) {
         this.groupRepository = groupRepository;
         this.currencyRepository = currencyRepository;
-        this.ownerAccountRepository = ownerAccountRepository;
+        this.subscriptionGuard = subscriptionGuard;
     }
 
     @Transactional
     public GroupResponse create(Long ownerId, GroupCreateRequest request) {
-        OwnerAccount owner = ownerAccountRepository.findById(ownerId).orElse(null);
-        if (owner != null) {
-            java.time.Instant now = java.time.Instant.now();
-            boolean isLifetime = "LIFETIME".equalsIgnoreCase(owner.getSubscriptionStatus());
-            if (!isLifetime) {
-                java.time.Instant endsAt = owner.getSubscriptionEndsAt() != null ? owner.getSubscriptionEndsAt() : now;
-                java.time.Instant graceEnd = endsAt.plus(java.time.Duration.ofDays(3));
-                if (now.isAfter(graceEnd)) {
-                    throw new com.tongtin.common.errors.ForbiddenException("Gói sử dụng của bạn đã hết hạn. Vui lòng nâng cấp gói để tạo thêm dây hụi mới.");
-                }
-            }
-        }
+        subscriptionGuard.assertCanCreateGroup(ownerId);
 
         Group group = new Group();
         group.setOwnerId(ownerId);

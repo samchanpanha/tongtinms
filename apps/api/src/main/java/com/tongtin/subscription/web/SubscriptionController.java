@@ -53,8 +53,7 @@ public class SubscriptionController {
     public ResponseEntity<SubscriptionOrder> verifyOrder(
             @AuthenticationPrincipal AuthPrincipal principal,
             @PathVariable String tranId) {
-        SubscriptionOrder order = subscriptionService.verifyAndActivateOrder(
-                tranId, "VERIFY_" + System.currentTimeMillis(), "{\"status\":0,\"message\":\"Verified via Host portal\"}");
+        SubscriptionOrder order = subscriptionService.verifyOrderForOwner(principal.ownerId(), tranId);
         return ResponseEntity.ok(order);
     }
 

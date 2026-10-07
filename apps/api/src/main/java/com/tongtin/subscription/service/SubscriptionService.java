@@ -2,6 +2,7 @@ package com.tongtin.subscription.service;
 
 import com.tongtin.common.errors.BadRequestException;
 import com.tongtin.common.errors.ConflictException;
+import com.tongtin.common.errors.ForbiddenException;
 import com.tongtin.common.errors.NotFoundException;
 import com.tongtin.groups.repository.GroupRepository;
 import com.tongtin.identity.entity.AuditEvent;
@@ -104,9 +105,7 @@ public class SubscriptionService {
         String effectiveStatus = isLifetime ? "LIFETIME" :
                 (isExpired ? "EXPIRED" : (isGracePeriod ? "GRACE_PERIOD" : (isTrial ? "TRIAL" : "ACTIVE")));
 
-        long groupsCount = groupRepository.findAll().stream()
-                .filter(g -> g.getOwnerId().equals(ownerId))
-                .count();
+        long groupsCount = groupRepository.countByOwnerId(ownerId);
 
         long membersCount = memberProfileRepository.countByOwnerId(ownerId);
 
@@ -221,6 +220,10 @@ public class SubscriptionService {
             throw new BadRequestException("Selected subscription plan is inactive");
         }
 
+        if (!payWayService.isEnabled()) {
+            throw new BadRequestException("ABA PayWay payment gateway is currently disabled");
+        }
+
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("User not found"));
 
@@ -228,8 +231,9 @@ public class SubscriptionService {
                 .orElseThrow(() -> new NotFoundException("Owner not found"));
 
         String reqTime = payWayService.generateReqTime();
-        long nowMs = System.currentTimeMillis();
-        String tranId = "TT_" + ownerId + "_" + (nowMs % 1000000000L);
+        // Unguessable suffix: tran_id itself must not be enumerable.
+        String tranId = "TT_" + ownerId + "_"
+                + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 10);
 
         String merchantId = payWayService.getMerchantId();
         String amountStr = payWayService.formatAmount(plan.getPriceMinor(), plan.getCurrency());
@@ -383,6 +387,46 @@ public class SubscriptionService {
         return order;
     }
 
+    /**
+     * Gateway-verified activation: only activates after ABA PayWay's check-transaction
+     * API confirms the payment. Used by the public webhook callback, where request
+     * parameters alone must never be trusted.
+     */
+    @Transactional
+    public SubscriptionOrder verifyAndActivateViaGateway(String tranId) {
+        SubscriptionOrder order = orderRepository.findByTranId(tranId)
+                .orElseThrow(() -> new NotFoundException("Subscription order not found: " + tranId));
+
+        if ("PAID".equals(order.getStatus())) {
+            return order;
+        }
+
+        PayWayService.TransactionCheck check = payWayService.checkTransaction(
+                order.getReqTime(), payWayService.getMerchantId(), tranId);
+
+        if (!check.approved()) {
+            log.warn("Order {} not approved by ABA PayWay check-transaction; leaving status {}",
+                    tranId, order.getStatus());
+            return order;
+        }
+
+        return verifyAndActivateOrder(tranId, check.gatewayTranId(), check.rawJson());
+    }
+
+    /**
+     * Host-facing verification for the payment return page. Enforces order ownership
+     * before any gateway check, so a host cannot activate or probe another owner's order.
+     */
+    @Transactional
+    public SubscriptionOrder verifyOrderForOwner(Long ownerId, String tranId) {
+        SubscriptionOrder order = orderRepository.findByTranId(tranId)
+                .orElseThrow(() -> new NotFoundException("Subscription order not found: " + tranId));
+        if (!order.getOwnerId().equals(ownerId)) {
+            throw new ForbiddenException("You do not have access to this order");
+        }
+        return verifyAndActivateViaGateway(tranId);
+    }
+
     // ==========================================
     // 5. Admin Subscription Overrides & Settings
     // ==========================================
@@ -407,9 +451,7 @@ public class SubscriptionService {
                 }
             }
 
-            long groupsCount = groupRepository.findAll().stream()
-                    .filter(g -> g.getOwnerId().equals(owner.getId()))
-                    .count();
+            long groupsCount = groupRepository.countByOwnerId(owner.getId());
             long membersCount = memberProfileRepository.countByOwnerId(owner.getId());
 
             list.add(new HostAdminViewDto(

@@ -1,5 +1,6 @@
 package com.tongtin;
 
+import com.tongtin.common.errors.ForbiddenException;
 import com.tongtin.common.security.JwtService;
 import com.tongtin.identity.dto.RegisterOwnerRequest;
 import com.tongtin.identity.entity.OwnerAccount;
@@ -9,6 +10,7 @@ import com.tongtin.identity.repository.OwnerAccountRepository;
 import com.tongtin.identity.repository.UserRepository;
 import com.tongtin.identity.repository.UserRoleRepository;
 import com.tongtin.identity.service.AuthService;
+import com.tongtin.notify.repository.NotificationRepository;
 import com.tongtin.subscription.dto.ExtendSubscriptionRequest;
 import com.tongtin.subscription.dto.PayWayCheckoutRequest;
 import com.tongtin.subscription.dto.PayWayCheckoutResponse;
@@ -20,6 +22,8 @@ import com.tongtin.subscription.entity.SubscriptionOrder;
 import com.tongtin.subscription.repository.SubscriptionOrderRepository;
 import com.tongtin.subscription.repository.SubscriptionPlanRepository;
 import com.tongtin.subscription.service.PayWayService;
+import com.tongtin.subscription.service.SubscriptionGuard;
+import com.tongtin.subscription.service.SubscriptionLifecycleJob;
 import com.tongtin.subscription.service.SubscriptionService;
 import java.time.Duration;
 import java.time.Instant;
@@ -28,14 +32,21 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
+@AutoConfigureMockMvc
 @ActiveProfiles("test")
 @Transactional
 public class SubscriptionAndPayWayTests {
@@ -45,6 +56,15 @@ public class SubscriptionAndPayWayTests {
 
     @Autowired
     private SubscriptionService subscriptionService;
+
+    @Autowired
+    private SubscriptionGuard subscriptionGuard;
+
+    @Autowired
+    private SubscriptionLifecycleJob lifecycleJob;
+
+    @Autowired
+    private NotificationRepository notificationRepository;
 
     @Autowired
     private PayWayService payWayService;
@@ -69,6 +89,9 @@ public class SubscriptionAndPayWayTests {
 
     @Autowired
     private JwtService jwtService;
+
+    @Autowired
+    private MockMvc mockMvc;
 
     private Long hostUserId;
     private Long hostOwnerId;
@@ -248,5 +271,156 @@ public class SubscriptionAndPayWayTests {
 
         SubscriptionStatusResponse status = subscriptionService.getMyStatus(hostOwnerId);
         assertTrue(status.daysRemaining() >= 88); // 30 trial + 60 extension
+    }
+
+    @Test
+    @DisplayName("Security: payment simulation is rejected outside sandbox mode")
+    void testSimulatePaymentBlockedOutsideSandbox() throws Exception {
+        subscriptionService.updatePayWaySettings(adminUserId, new PayWaySettingsDto(
+                payWayService.getMerchantId(), payWayService.getApiKey(), payWayService.getApiUrl(),
+                payWayService.getCheckUrl(), false, true, 30, 3, true));
+
+        SubscriptionPlanDto plan = subscriptionService.getActivePlans().get(0);
+        PayWayCheckoutResponse checkout = subscriptionService.checkoutPayWay(
+                hostUserId, hostOwnerId, new PayWayCheckoutRequest(plan.id(), null, null, null, null));
+
+        mockMvc.perform(post("/api/v1/payments/payway/simulate-complete")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"tranId\":\"" + checkout.tranId() + "\"}"))
+                .andExpect(status().isForbidden());
+
+        SubscriptionOrder order = orderRepository.findByTranId(checkout.tranId()).orElseThrow();
+        assertEquals("PENDING", order.getStatus());
+    }
+
+    @Test
+    @DisplayName("Security: simulated payment in sandbox mode still activates the order")
+    void testSimulatePaymentWorksInSandbox() throws Exception {
+        // Sandbox mode is the seeded default (payway_sandbox_mode = true)
+        SubscriptionPlanDto plan = subscriptionService.getActivePlans().get(0);
+        PayWayCheckoutResponse checkout = subscriptionService.checkoutPayWay(
+                hostUserId, hostOwnerId, new PayWayCheckoutRequest(plan.id(), null, null, null, null));
+
+        mockMvc.perform(post("/api/v1/payments/payway/simulate-complete")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"tranId\":\"" + checkout.tranId() + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.orderStatus").value("PAID"));
+    }
+
+    @Test
+    @DisplayName("Security: a host cannot verify another host's payment order")
+    void testVerifyOrderEnforcesOwnership() throws Exception {
+        String secondPhone = "0988333444";
+        authService.registerOwner(new RegisterOwnerRequest(
+                "Chủ Hụi Hai", secondPhone, "password123", "password123", null, null, true));
+        User second = userRepository.findByPhone(com.tongtin.common.util.PhoneUtil.normalize(secondPhone))
+                .orElseThrow();
+        OwnerAccount secondOwner = ownerAccountRepository.findByUserId(second.getId()).orElseThrow();
+
+        SubscriptionPlanDto plan = subscriptionService.getActivePlans().get(0);
+        PayWayCheckoutResponse checkout = subscriptionService.checkoutPayWay(
+                second.getId(), secondOwner.getId(), new PayWayCheckoutRequest(plan.id(), null, null, null, null));
+
+        String hostToken = jwtService.accessToken(hostUserId, hostOwnerId, List.of("HOST"));
+        mockMvc.perform(post("/api/v1/subscription/verify/" + checkout.tranId())
+                        .header("Authorization", "Bearer " + hostToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("Security: gateway verification never activates an unpaid order")
+    void testGatewayVerificationLeavesUnpaidOrderPending() {
+        SubscriptionPlanDto plan = subscriptionService.getActivePlans().get(0);
+        PayWayCheckoutResponse checkout = subscriptionService.checkoutPayWay(
+                hostUserId, hostOwnerId, new PayWayCheckoutRequest(plan.id(), null, null, null, null));
+
+        // ABA PayWay has no record of this tran_id, so the check must not approve it
+        SubscriptionOrder order = subscriptionService.verifyAndActivateViaGateway(checkout.tranId());
+        assertEquals("PENDING", order.getStatus());
+
+        OwnerAccount owner = ownerAccountRepository.findById(hostOwnerId).orElseThrow();
+        assertEquals("TRIAL", owner.getSubscriptionStatus());
+    }
+
+    @Test
+    @DisplayName("Guard: expiry, grace period, enforcement switch and plan limits drive group creation")
+    void testSubscriptionGuardPolicies() {
+        // Fresh trial host can create groups
+        assertDoesNotThrow(() -> subscriptionGuard.assertCanCreateGroup(hostOwnerId));
+
+        OwnerAccount owner = ownerAccountRepository.findById(hostOwnerId).orElseThrow();
+
+        // Expired beyond the configured grace period -> blocked
+        owner.setSubscriptionEndsAt(Instant.now().minus(Duration.ofDays(10)));
+        ownerAccountRepository.saveAndFlush(owner);
+        assertThrows(ForbiddenException.class, () -> subscriptionGuard.assertCanCreateGroup(hostOwnerId));
+
+        // Inside the grace period -> allowed
+        owner.setSubscriptionEndsAt(Instant.now().minus(Duration.ofDays(1)));
+        ownerAccountRepository.saveAndFlush(owner);
+        assertDoesNotThrow(() -> subscriptionGuard.assertCanCreateGroup(hostOwnerId));
+
+        // Plan limit reached -> blocked
+        SubscriptionPlanDto cappedPlan = subscriptionService.createPlan(new PlanCreateUpdateRequest(
+                "CAP_TEST", "Gói Giới Hạn", "maxGroups=0", 100L, "USD", 1, 0, -1, "[]", null, 50, true));
+        owner.setCurrentPlanId(cappedPlan.id());
+        ownerAccountRepository.saveAndFlush(owner);
+        assertThrows(ForbiddenException.class, () -> subscriptionGuard.assertCanCreateGroup(hostOwnerId));
+
+        // Enforcement switch off -> always allowed
+        subscriptionService.updatePayWaySettings(adminUserId, new PayWaySettingsDto(
+                payWayService.getMerchantId(), payWayService.getApiKey(), payWayService.getApiUrl(),
+                payWayService.getCheckUrl(), true, true, 30, 3, false));
+        assertDoesNotThrow(() -> subscriptionGuard.assertCanCreateGroup(hostOwnerId));
+    }
+
+    @Test
+    @DisplayName("Lifecycle: reminders at 7/3/1 days, auto-expiry after grace period, skipped when enforcement off")
+    void testSubscriptionLifecycleJob() {
+        subscriptionService.updatePayWaySettings(adminUserId, new PayWaySettingsDto(
+                payWayService.getMerchantId(), payWayService.getApiKey(), payWayService.getApiUrl(),
+                payWayService.getCheckUrl(), true, true, 30, 3, true));
+
+        Instant now = Instant.now();
+
+        // 7 days + 1h remaining -> truncates to 7 days -> reminder
+        OwnerAccount owner = ownerAccountRepository.findById(hostOwnerId).orElseThrow();
+        owner.setSubscriptionEndsAt(now.plus(Duration.ofDays(7)).plus(Duration.ofHours(1)));
+        ownerAccountRepository.saveAndFlush(owner);
+
+        SubscriptionLifecycleJob.Result reminded = lifecycleJob.process(now);
+        assertTrue(reminded.remindersSent() >= 1);
+        assertTrue(countNotifications(hostUserId, "SUBSCRIPTION_EXPIRING") >= 1);
+
+        // 10 days past expiry with a 3-day grace period -> auto-expired
+        owner = ownerAccountRepository.findById(hostOwnerId).orElseThrow();
+        owner.setSubscriptionEndsAt(now.minus(Duration.ofDays(10)));
+        ownerAccountRepository.saveAndFlush(owner);
+
+        SubscriptionLifecycleJob.Result expired = lifecycleJob.process(now);
+        assertTrue(expired.expiredCount() >= 1);
+        assertEquals("EXPIRED",
+                ownerAccountRepository.findById(hostOwnerId).orElseThrow().getSubscriptionStatus());
+        long expiredNotices = countNotifications(hostUserId, "SUBSCRIPTION_EXPIRED");
+        assertTrue(expiredNotices >= 1);
+
+        // A later run must not expire (or re-notify) the same owner again
+        lifecycleJob.process(now);
+        assertEquals("EXPIRED",
+                ownerAccountRepository.findById(hostOwnerId).orElseThrow().getSubscriptionStatus());
+        assertEquals(expiredNotices, countNotifications(hostUserId, "SUBSCRIPTION_EXPIRED"));
+
+        // Enforcement switch off -> nothing is processed at all
+        subscriptionService.updatePayWaySettings(adminUserId, new PayWaySettingsDto(
+                payWayService.getMerchantId(), payWayService.getApiKey(), payWayService.getApiUrl(),
+                payWayService.getCheckUrl(), true, true, 30, 3, false));
+        assertEquals(new SubscriptionLifecycleJob.Result(0, 0), lifecycleJob.process(now));
+    }
+
+    private long countNotifications(Long userId, String type) {
+        return notificationRepository.findTop100ByUserIdOrderByCreatedAtDesc(userId).stream()
+                .filter(n -> type.equals(n.getType()))
+                .count();
     }
 }

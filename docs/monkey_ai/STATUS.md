@@ -347,13 +347,42 @@ LAST_UPDATED: 2026-10-07
 - [x] Database state: left completely clean (0 users, 0 groups, 0 audit events).
 - [x] Build status: 18/18 steps (Step 00 through Step 18) 100% COMPLETE.
 
+## Post-delivery audit & SaaS hardening (2026-10-07)
+
+- [x] Full audit: backend `mvn test` green, frontend lint/build clean, then a manual
+      security review of the Step 19 subscription/PayWay layer
+- [x] **Critical: payment bypasses closed** — `simulate-complete` returns 403 outside sandbox
+      mode; public webhook callback activates ONLY after ABA check-transaction confirms
+      APPROVED (never from URL params); `POST /subscription/verify/{tranId}` enforces order
+      ownership (foreign host 403); `tran_id` now `TT_<ownerId>_<uuid10>` (unguessable);
+      checkout blocked (400) when `payway_enabled = false`
+- [x] **Policy fixes** — new `SubscriptionGuard` (single policy point): `enforce_subscription`
+      switch, `grace_period_days` setting (was hardcoded 3 days), plan `max_groups` limit
+      (was never enforced); `GroupService.create` delegates to it
+- [x] **Correctness/perf** — `PayWayService.formatAmount` uses BigDecimal (zero-float
+      invariant restored on the payment path); CORS allows `Idempotency-Key` (Step 16
+      replays work from the Next.js origin); `GroupRepository.countByOwnerId` replaces
+      findAll scans in status/admin queries
+- [x] **Improvement implemented** — `SubscriptionLifecycleJob` + `@EnableScheduling`:
+      runs daily 08:00; skipped when enforcement is off; SUBSCRIPTION_EXPIRING reminders
+      at 7/3/1 days remaining; auto-expires owners past `subscription_ends_at + grace`
+      (status → EXPIRED + SUBSCRIPTION_EXPIRED notification, never re-notified);
+      host-billing scope only (member group events keep the Step 14 sync-only decision)
+- [x] Tests: +5 security + 1 lifecycle in `SubscriptionAndPayWayTests` (now 13 in class);
+      full suite **132 tests, 0 failures**; frontend untouched
+- [x] `plan.md` §7 records the fixes + ranked roadmap of analyzed ideas (real gateway
+      return-flow wiring, `payment_events` forensics, checkout idempotency, index, ...)
+
 ## Next action
 
-Project fully delivered and complete! All 18 steps accepted.
+All 19 steps delivered AND the post-delivery audit is complete (2026-10-07, `plan.md` §7).
 To run the full system with pre-seeded demo data anytime:
 ```bash
 ./start.sh --seed
 ```
+Next improvement candidates (user picks — see `plan.md` §7.5): wire real PayWay return
+flow to `POST /subscription/verify/{tranId}`, `payment_events` forensics, checkout
+idempotency, `owner_accounts(subscription_ends_at, subscription_status)` index.
 
 ## Blockers
 

@@ -28,7 +28,9 @@ public class PayWayCallbackController {
     }
 
     /**
-     * ABA PayWay Webhook callback endpoint according to developer.payway.com.kh
+     * ABA PayWay Webhook callback endpoint according to developer.payway.com.kh.
+     * The callback parameters are never trusted on their own: activation happens only
+     * after the check-transaction API confirms the payment with ABA PayWay.
      */
     @PostMapping("/callback")
     public ResponseEntity<Map<String, Object>> handlePayWayCallback(
@@ -47,12 +49,11 @@ public class PayWayCallbackController {
         }
 
         try {
-            subscriptionService.verifyAndActivateOrder(
-                    effectiveTranId,
-                    apv != null ? apv : "WEBHOOK_" + System.currentTimeMillis(),
-                    body != null ? body.toString() : "{\"status\":0}"
-            );
-            return ResponseEntity.ok(Map.of("status", 0, "description", "Success"));
+            SubscriptionOrder order = subscriptionService.verifyAndActivateViaGateway(effectiveTranId);
+            return ResponseEntity.ok(Map.of(
+                    "status", 0,
+                    "description", "Success",
+                    "orderStatus", order.getStatus()));
         } catch (Exception ex) {
             log.error("Failed to process PayWay callback for {}: {}", effectiveTranId, ex.getMessage());
             return ResponseEntity.badRequest().body(Map.of("status", 1, "message", ex.getMessage()));
@@ -60,10 +61,18 @@ public class PayWayCallbackController {
     }
 
     /**
-     * Development / Sandbox simulation endpoint for testing the entire PayWay payment flow
+     * Development / Sandbox simulation endpoint for testing the entire PayWay payment flow.
+     * Hard-disabled outside sandbox mode so it can never be used to obtain a free
+     * subscription in production.
      */
     @PostMapping("/simulate-complete")
     public ResponseEntity<Map<String, Object>> simulateComplete(@RequestBody Map<String, String> body) {
+        if (!payWayService.isSandbox()) {
+            return ResponseEntity.status(403).body(Map.of(
+                    "status", 1,
+                    "message", "Payment simulation is disabled outside sandbox mode"));
+        }
+
         String tranId = body.get("tranId");
         if (tranId == null || tranId.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("status", 1, "message", "Missing tranId"));

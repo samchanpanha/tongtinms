@@ -17,6 +17,8 @@ public interface MemberProfileRepository extends JpaRepository<MemberProfile, Lo
 
     boolean existsByOwnerIdAndPhone(Long ownerId, String phone);
 
+    long countByOwnerId(Long ownerId);
+
     @Query("""
             SELECT m FROM MemberProfile m
             WHERE m.ownerId = :ownerId

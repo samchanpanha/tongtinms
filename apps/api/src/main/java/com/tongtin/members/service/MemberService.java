@@ -156,7 +156,7 @@ public class MemberService {
                 userRoleRepository.save(new UserRole(user.getId(), "MEMBER"));
             }
             auditLogin(ownerId, member, "MEMBER_LOGIN_RESET");
-            notificationService.create(user.getId(), "MEMBER_LOGIN_NOTICE",
+            notificationService.notifyUser(user.getId(), "MEMBER_LOGIN_NOTICE",
                     "Cap quyen dang nhap",
                     "Host da dat lai mat khau dang nhap cua ban.");
             return Map.of("memberId", member.getId(), "phone", member.getPhone(), "loginEnabled", true, "reset", true);
@@ -174,7 +174,7 @@ public class MemberService {
         }
         userRoleRepository.save(new UserRole(user.getId(), "MEMBER"));
         auditLogin(ownerId, member, "MEMBER_LOGIN_CREATED");
-        notificationService.create(user.getId(), "MEMBER_LOGIN_NOTICE",
+        notificationService.notifyUser(user.getId(), "MEMBER_LOGIN_NOTICE",
                 "Cap quyen dang nhap",
                 "Host da tao tai khoan dang nhap cho ban; hay dat mat khau moi.");
         return Map.of("memberId", member.getId(), "phone", member.getPhone(), "loginEnabled", true, "reset", false);

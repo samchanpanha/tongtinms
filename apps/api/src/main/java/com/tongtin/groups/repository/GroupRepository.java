@@ -13,6 +13,8 @@ public interface GroupRepository extends JpaRepository<Group, Long> {
 
     Optional<Group> findByOwnerIdAndId(Long ownerId, Long id);
 
+    long countByOwnerId(Long ownerId);
+
     @Query("SELECT g.code FROM Group g WHERE g.ownerId = :ownerId AND g.code LIKE CONCAT(:prefix, '%')")
     List<String> findCodesByOwnerStartingWith(@Param("ownerId") Long ownerId, @Param("prefix") String prefix);
 }

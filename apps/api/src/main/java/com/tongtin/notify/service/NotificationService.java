@@ -51,8 +51,8 @@ public class NotificationService {
         this.shareRepository = shareRepository;
     }
 
-    /** Best-effort single notification. Never throws. */
-    public void create(Long userId, String type, String title, String body) {
+    /** Best-effort single notification by user id. Never throws. */
+    public void notifyUser(Long userId, String type, String title, String body) {
         if (userId == null) {
             return;
         }
@@ -110,7 +110,7 @@ public class NotificationService {
             userRepository.findByPhone(phone).map(User::getId).ifPresent(userIds::add);
         }
         for (Long userId : userIds) {
-            create(userId, type, title, body);
+            notifyUser(userId, type, title, body);
         }
     }
 
