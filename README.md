@@ -1,4 +1,4 @@
-# Tong Tin Management System (Hệ Thống Quản Lý Hụi / Hội / ROSCA)
+# ប្រព័ន្ធគ្រប់គ្រងតុងទីន (Tong Tin Management System - ប្រព័ន្ធគ្រប់គ្រងហ៊ុយ / ហ៊ុយ / ROSCA)
 
 [![Java 21](https://img.shields.io/badge/Java-21-orange.svg)](https://openjdk.org/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.5-brightgreen.svg)](https://spring.io/projects/spring-boot)
@@ -7,177 +7,177 @@
 [![Tests](https://img.shields.io/badge/Tests-184%20passed-success.svg)](#testing--verification)
 [![License](https://img.shields.io/badge/License-Proprietary-lightgrey.svg)]()
 
-> **Nền tảng quản lý Hụi / Hội (ROSCA — Rotating Savings and Credit Association) hiện đại, minh bạch và bảo mật**, thiết kế chuẩn xác theo tập quán tài chính truyền thống Việt Nam và thông lệ quốc tế.
+> **វេទិកាគ្រប់គ្រងហ៊ុយ / ហ៊ុយ (ROSCA — Rotating Savings and Credit Association) ទំនើប តម្លាភាព និងសុវត្ថិភាព** ដែលត្រូវបានរចនាត្រឹមត្រូវតាមទំនៀមទម្លាប់ហិរញ្ញវត្ថុប្រពៃណីវៀតណាម និងស្តង់ដារអន្តរជាតិ។
 
 ---
 
-## 🌟 Tổng Quan Kiến Trúc (Architecture Overview)
+## 🌟 ទិដ្ឋភាពរួមនៃស្ថាបត្យកម្ម (Architecture Overview)
 
-Hệ thống được tổ chức theo mô hình **Modular Monolith** kết hợp ứng dụng Web hiện đại:
+ប្រព័ន្ធត្រូវបានរៀបចំតាមគំរូ **Modular Monolith** រួមបញ្ចូលគ្នាជាមួយកម្មវិធីបណ្តាញទំនើប៖
 
 ```
 tongtin/
 ├── apps/
 │   ├── api/                     # Spring Boot 3 (Java 21) REST Backend
 │   │   ├── src/main/java/com/tongtin/
-│   │   │   ├── common/          # Money (long minor units), lỗi chuẩn, bảo mật JWT, healthcheck
-│   │   │   ├── identity/        # Xác thực JWT, tự đăng ký Chủ Hụi, sổ kiểm toán (Audit Trail)
-│   │   │   ├── members/         # Quản lý danh bạ hội viên & phân quyền đăng nhập
-│   │   │   ├── groups/          # Cấu hình dây hụi (BIDDING / FIXED_EQUAL) & gán chân hụi
-│   │   │   ├── cycles/          # Vòng quay kỳ hụi, bỏ thăm kín (cycles/bids) & chốt kỳ
-│   │   │   ├── ledger/          # Công thức tài chính, nghĩa vụ nợ, đóng tiền & phí trễ hạn
-│   │   │   ├── dashboard/       # Bảng điều khiển KPI Chủ Hụi & phân tích lợi nhuận
-│   │   │   ├── reports/         # Sổ cái, báo cáo tiền thảo, sao kê hội viên & xuất CSV/XLSX
-│   │   │   ├── notify/          # Hệ thống thông báo nội bộ trong ứng dụng
-│   │   │   ├── memberportal/    # Cổng thông tin Hội Viên (Member Portal)
-│   │   │   ├── subscription/    # Gói cước SaaS, tích hợp ABA PayWay & nhật ký thanh toán
-│   │   │   ├── settings/        # Cấu hình hệ thống & gói tham số dây hụi mặc định
-│   │   │   └── demo/            # Trình nạp dữ liệu mẫu (Demo Fixture Seeder)
+│   │   │   ├── common/          # ការគ្រប់គ្រងលុយ (ជា long minor units), កំហុសស្តង់ដារ, សុវត្ថិភាព JWT, healthcheck
+│   │   │   ├── identity/        # ការផ្ទៀងផ្ទាត់ JWT, ការចុះឈ្មោះម្ចាស់ហ៊ុយដោយខ្លួនឯង, សៀវភៅសវនកម្ម (Audit Trail)
+│   │   │   ├── members/         # ការគ្រប់គ្រងបញ្ជីសមាជិក និងការបែងចែកសិទ្ធិចូលប្រើប្រាស់
+│   │   │   ├── groups/          # កំណត់រចនាសម្ព័ន្ធខ្សែហ៊ុយ (BIDDING / FIXED_EQUAL) និងការចាត់តាំងកៅអីហ៊ុយ
+│   │   │   ├── cycles/          # វដ្តវិលនៃវគ្គហ៊ុយ, ការដាក់ដេញថ្លៃសម្ងាត់ (cycles/bids) និងការបិទវគ្គ
+│   │   │   ├── ledger/          # រូបមន្តហិរញ្ញវត្ថុ, កាតព្វកិច្ចបំណុល, ការបង់លុយ និងថ្លៃផាកពិន័យយឺត
+│   │   │   ├── dashboard/       # ផ្ទាំងគ្រប់គ្រង KPI របស់ម្ចាស់ហ៊ុយ & ការវិភាគប្រាក់ចំណេញ
+│   │   │   ├── reports/         # សៀវភៅគណនេយ្យ, របាយការណ៍ថ្លៃម្ចាស់ហ៊ុយ, របាយការណ៍សមាជិក & នាំចេញជា CSV/XLSX
+│   │   │   ├── notify/          # ប្រព័ន្ធជូនដំណឹងខាងក្នុងកម្មវិធី
+│   │   │   ├── memberportal/    # វិបផតថលសម្រាប់សមាជិក (Member Portal)
+│   │   │   ├── subscription/    # កញ្ចប់សេវាកម្ម SaaS, រួមបញ្ចូល ABA PayWay & កំណត់ហេតុការទូទាត់
+│   │   │   ├── settings/        # ការកំណត់ប្រព័ន្ធ & កញ្ចប់ប៉ារ៉ាម៉ែត្រលំនាំដើមសម្រាប់ខ្សែហ៊ុយថ្មី
+│   │   │   └── demo/            # ឧបករណ៍បញ្ចូលទិន្នន័យគំរូ (Demo Fixture Seeder)
 │   │   └── src/main/resources/db/migration/  # 14 Flyway Migrations (V1 -> V14)
 │   │
 │   └── web/                     # Next.js 16 App Router + Tailwind CSS v4 Frontend
-│       ├── app/                 # 13 routes: landing, login, register, host portal, member portal
-│       ├── components/          # StatCard, StatusBadge, EmptyState, Navbar, v.v.
-│       └── lib/                 # Client API wrapper, formatMoney (1.000.000 đ), định dạng ngày
+│       ├── app/                 # 13 ផ្លូវ៖ ទំព័រដើម, ចូល, ចុះឈ្មោះ, host portal, member portal
+│       ├── components/          # StatCard, StatusBadge, EmptyState, Navbar, ល។
+│       └── lib/                 # កម្មវិធីរុំ API របស់ម៉ាស៊ីនភ្ញៀវ, formatMoney (១.០០០.០០០៛), ទម្រង់កាលបរិច្ឆេទ
 │
-├── docker-compose.yml           # Triển khai Docker: PostgreSQL 16 + Backend API + Frontend Web
-├── start.sh                     # Kịch bản khởi động toàn bộ một lệnh (All-in-one startup)
-└── docs/                        # Tài liệu đặc tả kỹ thuật toàn diện
+├── docker-compose.yml           # ប្រើប្រាស់ Docker៖ PostgreSQL 16 + Backend API + Frontend Web
+├── start.sh                     # ស្គ្រីបចាប់ផ្តើមប្រព័ន្ធទាំងមូលក្នុងមួយបញ្ជា (All-in-one startup)
+└── docs/                        # ឯកសារលក្ខណៈបច្ចេកទេសពេញលេញ
 ```
 
 ---
 
-## 🔒 Các Nguyên Tắc Tài Chính & Bất Biến Cốt Lõi (Core Invariants)
+## 🔒 គោលការណ៍ហិរញ្ញវត្ថុ និងច្បាប់មិនអាចផ្លាស់ប្តូរបាន (Core Invariants)
 
-1. **Tuyệt đối không sử dụng số thực (No Floating-Point Money Math)**:
-   - Toàn bộ số tiền được lưu trữ và tính toán dưới dạng số nguyên `long` (đơn vị minor unit: VND không có số thập phân, USD/KHR hỗ trợ đúng exponent).
-   - Tỷ lệ phần trăm tính bằng basis points (bps) với phép làm tròn chuẩn tài chính `RoundingMode.HALF_UP`.
-2. **Cân Bằng Tuyệt Đối Sổ Cái Kép (Double-Sided Balanced Ledger)**:
-   - Mọi kỳ hụi khi chốt đều bảo toàn định luật tài chính: `SUM(IN) == SUM(OUT) == Tổng gom (Gross Pot)`.
-   - Các khoản đóng (CONTRIBUTION), tiền thảo (HOST_FEE) và tiền giao hụi (PAYOUT) được hạch toán minh bạch.
-3. **Bỏ Thăm Kín Bảo Mật (Sealed Bidding Confidentiality)**:
-   - Trong thời gian mở kỳ bỏ giá, các mức giá bỏ thăm của hội viên được giữ bí mật hoàn toàn.
-   - Chỉ khi chốt kỳ hụi (`close-and-calculate`), hệ thống mới công bố giá trúng và danh sách chi tiết.
-   - Báo cáo công khai của Hội Viên (`/me/groups/{id}/cycles`) tuyệt đối không làm lộ tiền thảo của Chủ Hụi.
-4. **Chống Trùng Lặp Thanh Toán (Payment Idempotency Key)**:
-   - API thanh toán hỗ trợ header `Idempotency-Key` với chỉ mục `UNIQUE (group_id, idempotency_key)`.
-   - Việc gửi lại yêu cầu khi mạng chập chờn đảm bảo trả về kết quả 200 OK của giao dịch đã ghi nhận, không bao giờ trừ/cộng trùng tiền.
-5. **Cách Ly Đa Khách Hàng Tuyệt Đối (Multi-Tenant Isolation)**:
-   - Mọi dữ liệu dây hụi, hội viên, giao dịch đều phân lập chặt chẽ theo `owner_id`.
-   - Hội viên chỉ truy cập được dữ liệu thuộc về chính các chân hụi mình sở hữu.
+1. **ហាមប្រើប្រាស់លេខទសភាគ (No Floating-Point Money Math)៖**
+   - លុយទាំងអស់ត្រូវបានរក្សាទុក និងគណនាជាចំនួនគត់ `long` (ឯកតា minor unit៖ VND មិនមានខ្ទង់ទសភាគ, USD/KHR គាំទ្រត្រឹមត្រូវតាម exponent)។
+   - ភាគរយត្រូវបានគណនាដោយ basis points (bps) ជាមួយនឹងការបង្គត់តាមស្តង់ដារហិរញ្ញវត្ថុ `RoundingMode.HALF_UP`។
+2. **តុល្យភាពដាច់ខាតនៃសៀវភៅគណនេយ្យទ្វេភាគ (Double-Sided Balanced Ledger)៖**
+   - រាល់វគ្គហ៊ុយនៅពេលបិទត្រូវតែរក្សាច្បាប់ហិរញ្ញវត្ថុ៖ `SUM(IN) == SUM(OUT) == ផលបូកសរុប (Gross Pot)`។
+   - ការបង់ប្រាក់ (CONTRIBUTION), ថ្លៃម្ចាស់ហ៊ុយ (HOST_FEE) និងការបញ្ចូលទឹកប្រាក់ (PAYOUT) ត្រូវបានកត់ត្រាដោយតម្លាភាព។
+3. **ការដាក់ដេញថ្លៃសម្ងាត់ដើម្បីសុវត្ថិភាព (Sealed Bidding Confidentiality)៖**
+   - ក្នុងអំឡុងពេលបើកវគ្គដាក់ដេញថ្លៃ តម្លៃដែលសមាជិកដាក់ដេញថ្លៃត្រូវបានរក្សាជាសម្ងាត់ទាំងស្រុង។
+   - តែនៅពេលបិទវគ្គហ៊ុយ (`close-and-calculate`) ប្រព័ន្ធទើបប្រកាសតម្លៃដែលឈ្នះ និងបញ្ជីលម្អិត។
+   - របាយការណ៍សាធារណៈរបស់សមាជិក (`/me/groups/{id}/cycles`) មិនដែលបង្ហាញថ្លៃម្ចាស់ហ៊ុយឡើយ។
+4. **ការទប់ស្កាត់ការទូទាត់ម្តងទៀត (Payment Idempotency Key)៖**
+   - API ទូទាត់គាំទ្រ header `Idempotency-Key` ជាមួយនឹងសន្ទស្សន៍ `UNIQUE (group_id, idempotency_key)`។
+   - ការផ្ញើសំណើម្តងទៀតនៅពេលបណ្តាញមិនស្ថិតស្ថេរនឹងធានាត្រឡប់មកលទ្ធផល 200 OK នៃប្រតិបត្តិការដែលបានកត់ត្រារួចហើយ មិនដែលដក/បន្ថែមលុយម្តងទៀតឡើយ។
+5. **ការបែងចែកទិន្នន័យពហុអតិថិជនដាច់ខាត (Multi-Tenant Isolation)៖**
+   - រាល់ទិន្នន័យខ្សែហ៊ុយ, សមាជិក, ប្រតិបត្តិការត្រូវបានបែងចែកដាច់ដោយឡែកតាម `owner_id`។
+   - សមាជិកអាចចូលប្រើប្រាស់តែទិន្នន័យដែលជាកម្មសិទ្ធិរបស់ខ្លួនឯងប៉ុណ្ណោះ។
 
 ---
 
-## 🚀 Hướng Dẫn Khởi Động Nhanh (Quickstart)
+## 🚀 ការណែនាំចាប់ផ្តើមរហ័ស (Quickstart)
 
-### Yêu Cầu Môi Trường
+### តម្រូវការបរិស្ថាន
 - **Docker** & **Docker Compose**
 - **Java 21** & **Maven 3.9+**
 - **Node.js 20+** & **npm**
 
-### Khởi Động Bằng Một Lệnh (`start.sh`)
+### ចាប់ផ្តើមដោយប្រើមួយបញ្ជាតែមួយ (`start.sh`)
 
-Chạy kịch bản khởi động tích hợp tại thư mục gốc của dự án:
+ដំណើរការស្គ្រីបចាប់ផ្តើមដែលរួមបញ្ចូលនៅថតឫសនៃគម្រោង៖
 
 ```bash
-# Cấp quyền thực thi (nếu cần)
+# ផ្តល់សិទ្ធិដំណើរការ (បើចាំបាច់)
 chmod +x start.sh
 
-# Khởi động kèm nạp sẵn dữ liệu mẫu thực nghiệm (N=10 kỳ hụi hoàn chỉnh)
+# ចាប់ផ្តើមជាមួយនឹងការបញ្ចូលទិន្នន័យគំរូ (N=10 វគ្គហ៊ុយដែលបានបញ្ចប់ទាំងស្រុង)
 ./start.sh --seed
 ```
 
-Kịch bản sẽ tự động:
-1. Khởi động PostgreSQL 16 trên cổng `5432` và chờ kiểm tra trạng thái sẵn sàng.
-2. Áp dụng toàn bộ 14 migration Flyway (V1 → V14) và khởi động API Spring Boot trên cổng `8080`.
-3. Nạp bộ dữ liệu mẫu chuẩn (Dây hụi 10 kỳ với đầy đủ bỏ thăm, sổ cái cân bằng, tiền thảo và thanh toán).
-4. Khởi động giao diện Next.js trên cổng `3000`.
+ស្គ្រីបនឹងធ្វើដោយស្វ័យប្រវត្តិ៖
+1. ចាប់ផ្តើម PostgreSQL 16 នៅលើច្រក `5432` ហើយរង់ចាំពិនិត្យស្ថានភាពត្រៀមរួចរាល់។
+2. អនុវត្តការផ្លាស់ប្តូរ 14 Flyway ទាំងអស់ (V1 → V14) ហើយចាប់ផ្តើម API Spring Boot នៅលើច្រក `8080`។
+3. បញ្ចូលសំណុំទិន្នន័យគំរូស្តង់ដារ (ខ្សែហ៊ុយ 10 វគ្គដែលមានការដាក់ដេញថ្លៃ សៀវភៅគណនេយ្យមានតុល្យភាព ថ្លៃម្ចាស់ហ៊ុយ និងការបង់ប្រាក់ពេញលេញ)។
+4. ចាប់ផ្តើមចំណុចប្រទាក់ Next.js នៅលើច្រក `3000`។
 
-### Các Tùy Chọn Khởi Động
+### ជម្រើសនៃការចាប់ផ្តើម
 
 ```bash
-./start.sh              # Khởi động PostgreSQL, Backend API và Frontend Web
-./start.sh --seed       # Khởi động và nạp sẵn dữ liệu mẫu thực nghiệm
-./start.sh --api-only   # Chỉ khởi động PostgreSQL và Backend API (cổng 8080)
-./start.sh --web-only   # Chỉ khởi động Frontend Web (cổng 3000)
-./start.sh --help       # Xem hướng dẫn tùy chọn
+./start.sh              # ចាប់ផ្តើម PostgreSQL, Backend API និង Frontend Web
+./start.sh --seed       # ចាប់ផ្តើមនិងបញ្ចូលទិន្នន័យគំរូ
+./start.sh --api-only   # ចាប់ផ្តើមតែ PostgreSQL និង Backend API (ច្រក 8080)
+./start.sh --web-only   # ចាប់ផ្តើមតែ Frontend Web (ច្រក 3000)
+./start.sh --help       # មើលការណែនាំអំពីជម្រើសផ្សេងៗ
 ```
 
-### Triển Khai Toàn Bộ Bằng Docker (Backend + Frontend + Database)
+### ដាក់ឲ្យដំណើរការប្រព័ន្ធទាំងមូលដោយប្រើ Docker (Backend + Frontend + Database)
 
-Không cần cài Java/Node trên máy — chỉ cần Docker. Toàn bộ hệ thống (PostgreSQL 16, API Spring Boot, giao diện Next.js) được đóng gói và chạy bằng một lệnh:
+មិនចាំបាច់ដំឡើង Java/Node នៅលើម៉ាស៊ីនទេ — គ្រាន់តែមាន Docker វាគ្រប់គ្រាន់ហើយ។ ប្រព័ន្ធទាំងមូល (PostgreSQL 16, API Spring Boot, ចំណុចប្រទាក់ Next.js) ត្រូវបានវេចខ្ចប់ និងដំណើរការដោយប្រើមួយបញ្ជាតែមួយ៖
 
 ```bash
-# (Tùy chọn) Sao chép cấu hình môi trường và chỉnh sửa
+# (ជម្រើស) ចម្លងឯកសារកំណត់បរិស្ថាន ហើយកែសម្រួល
 cp .env.example .env
 
-# Build và khởi động toàn bộ stack (lần đầu mất vài phút để build image)
+# បង្កើត និងចាប់ផ្តើមបណ្តុំបច្ចេកវិទ្យាទាំងមូល (លើកដំបូងអាចចំណាយពេលពីរបីនាទីដើម្បីបង្កើតរូបភាព)
 docker compose up --build -d
 
-# Xem trạng thái / log
+# មើលស្ថានភាព / កំណត់ហេតុ
 docker compose ps
 docker compose logs -f api
 
-# Dừng toàn bộ
+# បញ្ឈប់ប្រព័ន្ធទាំងមូល
 docker compose down
 ```
 
-- **API Spring Boot** chạy tại `http://localhost:8080` — tự động áp dụng Flyway migration khi khởi động, healthcheck tại `/api/v1/health`.
-- **Giao diện Next.js** chạy tại `http://localhost:3000` — tự động proxy `/api/*` sang container API qua build arg `API_INTERNAL_URL` (mặc định `http://api:8080`).
-- **Dữ liệu mẫu**: đặt `APP_SEED_DEMO=true` trong `.env` trước khi chạy để nạp bộ demo N=10 chuẩn (`./start.sh --seed` bản Docker).
-- **Bảo mật**: đổi `JWT_SECRET` trong `.env` trước khi triển khai thật.
-- `./start.sh` vẫn là quy trình phát triển (hot reload); Docker Compose là quy trình triển khai (image cố định, có healthcheck và tự khởi động lại).
+- **API Spring Boot** ដំណើរការនៅ `http://localhost:8080` — អនុវត្តការផ្លាស់ប្តូរ Flyway ដោយស្វ័យប្រវត្តិនៅពេលចាប់ផ្តើម, ពិនិត្យសុខភាពនៅ `/api/v1/health`។
+- **ចំណុចប្រទាក់ Next.js** ដំណើរការនៅ `http://localhost:3000` — ប្រើប្រាស់ប្រូកស៊ី `/api/*` ទៅកាន់កុងតឺន័រ API តាមរយៈ build arg `API_INTERNAL_URL` (លំនាំដើម `http://api:8080`)។
+- **ទិន្នន័យគំរូ**៖ កំណត់ `APP_SEED_DEMO=true` នៅក្នុង `.env` មុនពេលដំណើរការដើម្បីបញ្ចូលសំណុំគំរូ N=10 ស្តង់ដារ (`./start.sh --seed` កំណែ Docker)។
+- **សុវត្ថិភាព**៖ ប្តូរ `JWT_SECRET` នៅក្នុង `.env` មុនពេលដាក់ឲ្យប្រើប្រាស់ពិតប្រាកដ។
+- `./start.sh` នៅតែជាដំណើរការសម្រាប់អភិវឌ្ឍន៍ (hot reload); Docker Compose គឺជាដំណើរការសម្រាប់ដាក់ឲ្យប្រើប្រាស់ (រូបភាពថេរ មាន healthcheck និងចាប់ផ្តើមឡើងវិញដោយស្វ័យប្រវត្តិ)។
 
-> Lưu ý: `API_INTERNAL_URL` được Next.js đóng băng vào web image lúc build (rewrites). Nếu đổi URL API, cần chạy lại `docker compose build web`.
+> ចំណាំ៖ `API_INTERNAL_URL` ត្រូវបាន Next.js រក្សាទុកជាអចិន្ត្រៃយ៍ក្នុងរូបភាព web នៅពេលបង្កើត (rewrites)។ ប្រសិនបើប្តូរ URL API ត្រូវដំណើរការ `docker compose build web` ម្តងទៀត។
 
 ---
 
-## 🌐 Các Điểm Truy Cập & Tài Khoản Thử Nghiệm
+## 🌐 ចំណុចចូលប្រើប្រាស់ និងគណនីសាកល្បង
 
-Sau khi khởi động với `--seed`, bạn có thể truy cập các dịch vụ:
+បន្ទាប់ពីចាប់ផ្តើមជាមួយ `--seed` អ្នកអាចចូលប្រើប្រាស់សេវាកម្មផ្សេងៗ៖
 
-- **Giao diện Web**: [http://localhost:3000](http://localhost:3000)
-- **Cổng Dịch Vụ API**: [http://localhost:8080/api/v1](http://localhost:8080/api/v1)
-- **Kiểm Tra Trạng Thái API**: [http://localhost:8080/api/v1/health](http://localhost:8080/api/v1/health)
-- **Tài Liệu Swagger / OpenAPI**: [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
+- **ចំណុចប្រទាក់បណ្តាញ**៖ [http://localhost:3000](http://localhost:3000)
+- **ច្រកសេវាកម្ម API**៖ [http://localhost:8080/api/v1](http://localhost:8080/api/v1)
+- **ពិនិត្យស្ថានភាព API**៖ [http://localhost:8080/api/v1/health](http://localhost:8080/api/v1/health)
+- **ឯកសារ Swagger / OpenAPI**៖ [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
 
-### 🔑 Thông Tin Đăng Nhập Dùng Thử (Demo Credentials)
+### 🔑 ព័ត៌មានចូលប្រើប្រាស់សម្រាប់សាកល្បង (Demo Credentials)
 
-| Vai Trò | Số Điện Thoại | Mật Khẩu | Quyền Hạn |
+| តួនាទី | លេខទូរស័ព្ទ | ពាក្យសម្ងាត់ | សិទ្ធិប្រើប្រាស់ |
 |---|---|---|---|
-| **Chủ Hụi (Host)** | `0900111001` | `demo1234` | Quản lý dây hụi, danh bạ hội viên, chốt kỳ, sổ cái, thu tiền |
-| **Hội Viên (Member)** | `0900100001` | `demo1234` | Bỏ thăm kín, theo dõi dây hụi, xem sao kê số dư cá nhân |
+| **ម្ចាស់ហ៊ុយ (Host)** | `0900111001` | `demo1234` | គ្រប់គ្រងខ្សែហ៊ុយ បញ្ជីសមាជិក បិទវគ្គ សៀវភៅគណនេយ្យ ប្រមូលលុយ |
+| **សមាជិក (Member)** | `0900100001` | `demo1234` | ដាក់ដេញថ្លៃសម្ងាត់ តាមដានខ្សែហ៊ុយ មើលរបាយការណ៍សមតុល្យផ្ទាល់ខ្លួន |
 
-*(Trên trang đăng nhập `/login` có sẵn các nút bấm 1 chạm để điền nhanh tài khoản dùng thử)*
-
----
-
-## 📱 Bản Đồ Các Trang Giao Diện (Frontend Routes)
-
-### 1. Phân Hệ Dành Cho Chủ Hụi (Host Portal)
-- [`/login`](http://localhost:3000/login): Đăng nhập hệ thống thống nhất cho cả Chủ Hụi và Hội Viên.
-- [`/register/owner`](http://localhost:3000/register/owner): Đăng ký tài khoản Chủ Hụi mới kèm thông tin ngân hàng.
-- [`/host`](http://localhost:3000/host): Bảng điều khiển KPI, tổng kết lợi nhuận theo từng loại tiền tệ (VND, USD, KHR).
-- [`/host/members`](http://localhost:3000/host/members): Danh bạ hội viên, tìm kiếm, tạo hồ sơ mới và cấp quyền đăng nhập.
-- [`/host/groups/new`](http://localhost:3000/host/groups/new): Trình tạo dây hụi mới với công cụ ước tính tổng gom và tiền thảo theo thời gian thực.
-- [`/host/groups/[id]`](http://localhost:3000/host/groups/1): Bàn điều khiển kỳ hụi — gán chân hụi, mở kỳ, nhập thăm, chốt sổ, giao hụi và ghi nhận đóng tiền.
-- [`/host/groups/[id]/ledger`](http://localhost:3000/host/groups/1/ledger): Báo cáo sổ cái kép chi tiết với chứng nhận cân bằng dòng tiền 100% — có nút xuất **CSV / Excel (.xlsx)**.
-
-### 2. Phân Hệ Dành Cho Hội Viên (Member Portal)
-- [`/app`](http://localhost:3000/app): Cổng thông tin hội viên tổng hợp các dây hụi đã tham gia.
-- [`/app/groups/[id]`](http://localhost:3000/app/groups/1): Giao diện bỏ thăm kín trực tiếp và bảng sao kê tài chính cá nhân (`contributed`, `received`, `netPosition`) — kèm nút xuất **CSV / Excel (.xlsx)**.
-- [`/notifications`](http://localhost:3000/notifications): Trung tâm thông báo sự kiện (mở kỳ, kết quả bỏ thăm, nhận tiền, hoàn thành dây hụi).
+*(នៅលើទំព័រចូល `/login` មានប៊ូតុងមួយចុចដើម្បីបំពេញគណនីសាកល្បងយ៉ាងរហ័ស)*
 
 ---
 
-## 🧪 Kiểm Thử & Đảm Bảo Chất Lượng (Testing & Verification)
+## 📱 ផែនទីនៃទំព័រចំណុចប្រទាក់ (Frontend Routes)
 
-### Kiểm Thử Backend (JUnit 5 + Spring Boot Test + Testcontainers)
-Toàn bộ hệ thống backend được bao phủ bởi **184 ca kiểm thử tự động**, bao gồm kiểm thử toán học biên, ma trận phân quyền chéo tenant, kiểm thử tương tranh và kiểm thử xuất file CSV/XLSX.
+### 1. ផ្នែកសម្រាប់ម្ចាស់ហ៊ុយ (Host Portal)
+- [`/login`](http://localhost:3000/login): ចូលប្រព័ន្ធដូចគ្នាសម្រាប់ទាំងម្ចាស់ហ៊ុយ និងសមាជិក។
+- [`/register/owner`](http://localhost:3000/register/owner): ចុះឈ្មោះគណនីម្ចាស់ហ៊ុយថ្មី ជាមួយនឹងព័ត៌មានគណនីធនាគារ។
+- [`/host`](http://localhost:3000/host): ផ្ទាំងគ្រប់គ្រង KPI, សង្ខេបប្រាក់ចំណេញតាមប្រភេទរូបិយប័ណ្ណនីមួយៗ (VND, USD, KHR)។
+- [`/host/members`](http://localhost:3000/host/members): បញ្ជីសមាជិក, ស្វែងរក, បង្កើតទម្រង់ថ្មី និងផ្តល់សិទ្ធិចូលប្រើប្រាស់។
+- [`/host/groups/new`](http://localhost:3000/host/groups/new): ឧបករណ៍បង្កើតខ្សែហ៊ុយថ្មី ជាមួយនឹងឧបករណ៍គណនាផលបូកសរុប និងថ្លៃម្ចាស់ហ៊ុយតាមពេលវេលាជាក់ស្តែង។
+- [`/host/groups/[id]`](http://localhost:3000/host/groups/1): ផ្ទាំងគ្រប់គ្រងវគ្គហ៊ុយ — ចាត់តាំងកៅអីហ៊ុយ បើកវគ្គ ដាក់ដេញថ្លៃ បិទសៀវភៅ ចែកលុយហ៊ុយ និងកត់ត្រាការបង់ប្រាក់។
+- [`/host/groups/[id]/ledger`](http://localhost:3000/host/groups/1/ledger): របាយការណ៍សៀវភៅគណនេយ្យទ្វេភាគលម្អិត ជាមួយនឹងវិញ្ញាបនបត្រតុល្យភាពលំហូរលុយ 100% — មានប៊ូតុងនាំចេញ **CSV / Excel (.xlsx)**។
 
-Từ **Step 28 (2026-10-08)** bộ test chạy **hermetic** bằng Testcontainers: mỗi lần `mvn test`
-tự khởi động một container `postgres:16` cô lập (Flyway migrate toàn bộ schema từ đầu) —
-**không đụng vào database dev**, không cần `docker compose up` trước. Chỉ cần Docker đang chạy:
+### 2. ផ្នែកសម្រាប់សមាជិក (Member Portal)
+- [`/app`](http://localhost:3000/app): វិបផតថលសមាជិកដែលប្រមូលផ្តុំខ្សែហ៊ុយដែលបានចូលរួមទាំងអស់។
+- [`/app/groups/[id]`](http://localhost:3000/app/groups/1): ចំណុចប្រទាក់ដាក់ដេញថ្លៃសម្ងាត់ដោយផ្ទាល់ និងតារាងរបាយការណ៍ហិរញ្ញវត្ថុផ្ទាល់ខ្លួន (`contributed`, `received`, `netPosition`) — ជាមួយនឹងប៊ូតុងនាំចេញ **CSV / Excel (.xlsx)**។
+- [`/notifications`](http://localhost:3000/notifications): មជ្ឈមណ្ឌលជូនដំណឹងអំពីព្រឹត្តិការណ៍ (បើកវគ្គ, លទ្ធផលដេញថ្លៃ, ទទួលលុយ, បញ្ចប់ខ្សែហ៊ុយ)។
+
+---
+
+## 🧪 ការសាកល្បង និងការធានាគុណភាព (Testing & Verification)
+
+### ការសាកល្បង Backend (JUnit 5 + Spring Boot Test + Testcontainers)
+ប្រព័ន្ធ backend ទាំងមូលត្រូវបានគ្របដណ្តប់ដោយ **184 ការសាកល្បងដោយស្វ័យប្រវត្តិ** រួមមានការសាកល្បងគណិតវិទ្យាគែម, ម៉ាទ្រីសបែងចែកសិទ្ធិឆ្លងកាត់ tenant, ការសាកល្បងការប្រកួតប្រជែង និងការសាកល្បងនាំចេញឯកសារ CSV/XLSX។
+
+ចាប់ពី **ជំហានទី 28 (ថ្ងៃទី 08 ខែតុលា ឆ្នាំ 2026)** សំណុំសាកល្បងដំណើរការ **hermetic** ដោយប្រើ Testcontainers៖ រាល់ពេលដែលដំណើរការ `mvn test`
+នឹងចាប់ផ្តើមកុងតឺន័រ `postgres:16` ដាច់ដោយឡែក (Flyway migrate ទាំងមូលគ្រោងការណ៍ពីដើម) —
+**មិនប៉ះពាល់ដល់មូលដ្ឋានទិន្នន័យ dev** មិនចាំបាច់ `docker compose up` មុនពេល។ គ្រាន់តែ Docker កំពុងដំណើរការ៖
 
 ```bash
 cd apps/api
@@ -189,77 +189,77 @@ mvn test
 [INFO] BUILD SUCCESS
 ```
 
-### Kiểm Tra Frontend (ESLint & Next.js Build)
-Mã nguồn frontend được kiểm tra nghiêm ngặt theo các tiêu chuẩn React 19 và biên dịch tối ưu hóa Turbopack:
+### ការពិនិត្យ Frontend (ESLint & Next.js Build)
+កូដប្រភព frontend ត្រូវបានពិនិត្យយ៉ាងម៉ត់ចត់តាមស្តង់ដារ React 19 និងចងក្រងជាមួយការបង្កើនប្រសិទ្ធភាព Turbopack៖
 
 ```bash
 cd apps/web
-npm run lint     # 0 errors, 0 warnings
-npm run build    # 13/13 routes tĩnh và động biên dịch thành công
+npm run lint     # 0 កំហុស, 0 ការព្រមាន
+npm run build    # 13/13 ផ្លូវឋិតិវន្ត និងថាមវន្តត្រូវបានចងក្រងដោយជោគជ័យ
 ```
 
 ---
 
-## 📜 Tiến Độ Thực Hiện 31 Giai Đoạn (Build Roadmap)
+## 📜 វឌ្ឍនភាពនៃការអនុវត្ត 31 ជំហាន (Build Roadmap)
 
-Hệ thống đã hoàn tất trọn vẹn **31/31 giai đoạn** theo đúng lộ trình đặc tả (`docs/monkey_ai/STATUS.md` + `plan.md`):
+ប្រព័ន្ធបានបញ្ចប់ទាំងស្រុង **31/31 ជំហាន** តាមផ្លូវដំណើរការដែលបានកំណត់ (`docs/monkey_ai/STATUS.md` + `plan.md`)៖
 
-| Giai Đoạn | Tên Giai Đoạn | Nội Dung Hoàn Thành |
+| ជំហាន | ឈ្មោះជំហាន | ខ្លឹមសារដែលបានបញ្ចប់ |
 |:---:|---|---|
-| **00** | **Planning Artifacts** | Đặc tả miền bài toán, công thức toán học, kiến trúc và quy tắc phân quyền |
-| **01** | **Monorepo Skeleton** | Khởi tạo cấu trúc monorepo `apps/api` và `apps/web`, proxy API reverse rewrite |
-| **02** | **Database & Flyway** | Thiết lập PostgreSQL 16, Flyway V1 (bảng `users`, `user_roles`) |
-| **03** | **Identity & Owner Register** | Đăng ký tài khoản Chủ Hụi, cấp phát JWT và Flyway V2 (`owner_accounts`) |
-| **04** | **Member Directory** | Quản lý danh bạ hội viên, phân tách tenant, Flyway V2.1 (`member_profiles`) |
-| **05** | **Group Draft** | Tạo dây hụi (BIDDING / FIXED_EQUAL), Flyway V3 (`currencies`, `groups`) |
-| **06** | **Shares & READY** | Gán chân hụi, kiểm soát đủ chân và chuyển trạng thái READY, Flyway V4 |
-| **07** | **Formula Engine** | Động cơ toán tài chính thuần Java, vượt qua 100% các fixture mẫu A, B, C, D |
-| **08** | **Cycle Open** | Quản lý trạng thái mở kỳ hụi tuần hoàn, Flyway V5 (`cycles`) |
-| **09** | **Sealed Bidding** | Cơ chế bỏ thăm kín bảo mật, bảo toàn tính bí mật trước hạn, Flyway V6 (`bids`) |
-| **10** | **Close & Calculate** | Chốt kỳ, xác định người hốt hụi, lập sổ cái cân bằng, Flyway V7 (`ledger_entries`) |
-| **11** | **Payments** | Thu tiền hụi, phân bổ nghĩa vụ nợ, Flyway V8 (`payments`, `payment_allocations`) |
-| **12** | **Host Dashboard** | Tổng hợp chỉ số KPI, kỳ đến hạn, công nợ và lợi nhuận tiền thảo theo loại tiền |
-| **13** | **Member Portal** | Cấp mật khẩu hội viên, API Cổng Hội Viên xem dây hụi và bỏ thăm trực tuyến |
-| **14** | **In-App Notifications** | Hệ thống thông báo nội bộ đa sự kiện theo thời gian thực, Flyway V9 (`notifications`) |
-| **15** | **Reports** | Báo cáo tiền thảo Chủ Hụi, sao kê vị thế Hội Viên và tóm tắt kỳ hụi công khai |
-| **16** | **Hardening** | Sổ kiểm toán (`audit_events`), Idempotency Key (Flyway V10), kiểm thử bảo mật & Demo Seeder |
-| **17** | **Preview Polish** | Giao diện tiếng Việt chuẩn mực, định dạng `1.000.000 đ`, Dark Mode, 13 routes, `start.sh` |
-| **18** | **Final Delivery** | Kiểm thử đầu cuối (E2E) trọn vẹn 10 quy trình, tài liệu hướng dẫn và hoàn tất chuyển giao |
-| **19** | **SaaS Subscriptions & ABA PayWay** | Tặng 1 tháng dùng thử miễn phí khi đăng ký Chủ Hụi, tích hợp cổng thanh toán ABA PayWay (HMAC-SHA512 KHQR & Card theo [developer.payway.com.kh](https://developer.payway.com.kh/)), cấu hình gói cước và quản trị hệ thống qua Admin Panel (Flyway V11) |
-| **20** | **Member Group Settings** | Cài đặt hệ thống (`system_settings`) và gói tham số công thức mặc định cho dây hụi mới (Flyway V?) |
-| **21** | **Bid Rules & Tiebreaking** | Chạm trần lãi suất, đấu giá vòng 2 (tiebreak), san đều tiền thảo qua nhiều phiên bỏ thăm |
-| **22** | **Late Fee Formula** | Tiền phạt rút hụi sớm / trễ hạn theo công thức, minh bạch trong sổ cái (Flyway V12 `payment_events`) |
-| **23** | **Subscription Funnel** | Trang đăng ký, quyền truy cập theo gói (PLUS/PREMIUM), giới hạn dây hụi, gia hạn & nhắc hết hạn (Flyway V13) |
-| **24** | **Cycle Public Summary** | Tóm tắt kỳ hụi công khai cho hội viên, minh bạch kết quả chốt kỳ |
-| **25** | **Settings & Rule Presets** | Quản lý gói cước, xáo trộn thứ tự bỏ thăm, lịch sử thay đổi, kiểm thử chéo |
-| **26** | **Multi-Currency Hardening** | Hỗ trợ USD/KHR theo exponent, làm tròn tài chính chuẩn, kiểm soát trạng thái tiền tệ |
-| **27** | **Cycle Settings UI** | Giao diện cấu hình kỳ hụi nâng cao, combo tham số và nhập liệu tiện dụng |
-| **28** | **Hermetic Tests & Release Gate** | Testcontainers tách biệt hoàn toàn khỏi DB dev, ReleaseGateTests chặn số thực, toàn bộ suite xanh |
-| **29** | **Late Fees Delivery** | Thu phí trễ hạn, chốt sổ tự động, queuing thanh toán, hiển thị đủ trên sổ cái & sao kê (Flyway V14) |
-| **30** | **CSV / Excel Exports** | Xuất sổ cái, báo cáo tiền thảo & sao kê hội viên ra **CSV** và **XLSX (Apache POI)** — cột đầy đủ, dòng TOTAL, phòng chống formula injection |
-| **31** | **Wrap-up & Cleanup** | Dọn tài liệu lỗi thời (README, chỉ mục, kiến trúc), xác minh toàn bộ qua Docker compose, kiểm tra suite + build cuối cùng |
+| **00** | **Planning Artifacts** | លក្ខណៈបច្ចេកទេសនៃបញ្ហា, រូបមន្តគណិតវិទ្យា, ស្ថាបត្យកម្ម និងច្បាប់បែងចែកសិទ្ធិ |
+| **01** | **Monorepo Skeleton** | ចាប់ផ្តើមរចនាសម្ព័ន្ធ monorepo `apps/api` និង `apps/web`, ការសរសេរឡើងវិញ API proxy |
+| **02** | **Database & Flyway** | រៀបចំ PostgreSQL 16, Flyway V1 (តារាង `users`, `user_roles`) |
+| **03** | **Identity & Owner Register** | ចុះឈ្មោះគណនីម្ចាស់ហ៊ុយ, បង្កើត JWT និង Flyway V2 (`owner_accounts`) |
+| **04** | **Member Directory** | គ្រប់គ្រងបញ្ជីសមាជិក, បែងចែក tenant, Flyway V2.1 (`member_profiles`) |
+| **05** | **Group Draft** | បង្កើតខ្សែហ៊ុយ (BIDDING / FIXED_EQUAL), Flyway V3 (`currencies`, `groups`) |
+| **06** | **Shares & READY** | ចាត់តាំងកៅអីហ៊ុយ, ពិនិត្យថាមានកៅអីគ្រប់គ្រាន់ ហើយប្តូរទៅស្ថានភាព READY, Flyway V4 |
+| **07** | **Formula Engine** | ម៉ាស៊ីនគណិតវិទ្យាហិរញ្ញវត្ថុដោយប្រើ Java សុទ្ធ ឆ្លងកាត់ 100% នៃទិន្នន័យគំរូ A, B, C, D |
+| **08** | **Cycle Open** | គ្រប់គ្រងស្ថានភាពបើកវគ្គហ៊ុយជាវដ្ត, Flyway V5 (`cycles`) |
+| **09** | **Sealed Bidding** | យន្តការដាក់ដេញថ្លៃសម្ងាត់ដើម្បីសុវត្ថិភាព, រក្សាការសម្ងាត់មុនកំណត់, Flyway V6 (`bids`) |
+| **10** | **Close & Calculate** | បិទវគ្គ, កំណត់អ្នកដែលឈ្នះហ៊ុយ, បង្កើតសៀវភៅគណនេយ្យមានតុល្យភាព, Flyway V7 (`ledger_entries`) |
+| **11** | **Payments** | ប្រមូលលុយហ៊ុយ, បែងចែកកាតព្វកិច្ចបំណុល, Flyway V8 (`payments`, `payment_allocations`) |
+| **12** | **Host Dashboard** | ប្រមូលផ្តុំសូចនាករ KPI, វគ្គដែលដល់កំណត់, បំណុល និងប្រាក់ចំណេញពីថ្លៃម្ចាស់ហ៊ុយតាមប្រភេទរូបិយប័ណ្ណ |
+| **13** | **Member Portal** | ផ្តល់ពាក្យសម្ងាត់សមាជិក, API វិបផតថលសមាជិកដើម្បីមើលខ្សែហ៊ុយ និងដាក់ដេញថ្លៃតាមអ៊ីនធឺណិត |
+| **14** | **In-App Notifications** | ប្រព័ន្ធជូនដំណឹងខាងក្នុងកម្មវិធីសម្រាប់ព្រឹត្តិការណ៍ផ្សេងៗតាមពេលវេលាជាក់ស្តែង, Flyway V9 (`notifications`) |
+| **15** | **Reports** | របាយការណ៍ថ្លៃម្ចាស់ហ៊ុយ, របាយការណ៍ទីតាំងរបស់សមាជិក និងសេចក្តីសង្ខេបវគ្គហ៊ុយសាធារណៈ |
+| **16** | **Hardening** | សៀវភៅសវនកម្ម (`audit_events`), Idempotency Key (Flyway V10), ការសាកល្បងសុវត្ថិភាព & Demo Seeder |
+| **17** | **Preview Polish** | ចំណុចប្រទាក់ជាភាសាវៀតណាមស្តង់ដារ, ទម្រង់ `1.000.000 đ`, Dark Mode, 13 ផ្លូវ, `start.sh` |
+| **18** | **Final Delivery** | ការសាកល្បងពីដើមដល់ចប់ (E2E) 10 ដំណើរការទាំងស្រុង, ឯកសារណែនាំ និងបញ្ចប់ការផ្ទេរ |
+| **19** | **SaaS Subscriptions & ABA PayWay** | ផ្តល់ 1 ខែប្រើប្រាស់ដោយឥតគិតថ្លៃនៅពេលម្ចាស់ហ៊ុយចុះឈ្មោះថ្មី, រួមបញ្ចូលច្រកទូទាត់ ABA PayWay (HMAC-SHA512 KHQR & Card តាម [developer.payway.com.kh](https://developer.payway.com.kh/)), ការកំណត់កញ្ចប់សេវាកម្ម និងគ្រប់គ្រងប្រព័ន្ធតាមរយៈផ្ទាំងគ្រប់គ្រងអ្នកគ្រប់គ្រង (Flyway V11) |
+| **20** | **Member Group Settings** | ការកំណត់ប្រព័ន្ធ (`system_settings`) និងកញ្ចប់ប៉ារ៉ាម៉ែត្រលំនាំដើមសម្រាប់ខ្សែហ៊ុយថ្មី |
+| **21** | **Bid Rules & Tiebreaking** | កំណត់អត្រាការប្រាក់អតិបរមា, ការដេញថ្លៃជុំទី 2 (tiebreak), ការបែងចែកថ្លៃម្ចាស់ហ៊ុយស្មើៗគ្នាតាមវគ្គដាក់ដេញថ្លៃច្រើន |
+| **22** | **Late Fee Formula** | ថ្លៃផាកពិន័យសម្រាប់ការដកហ៊ុយមុនកំណត់ / យឺតកំណត់តាមរូបមន្ត តម្លាភាពក្នុងសៀវភៅគណនេយ្យ (Flyway V12 `payment_events`) |
+| **23** | **Subscription Funnel** | ទំព័រចុះឈ្មោះ, សិទ្ធិចូលប្រើប្រាស់តាមកញ្ចប់ (PLUS/PREMIUM), ដែនកំណត់ចំនួនខ្សែហ៊ុយ, បន្តការប្រើប្រាស់ & ជូនដំណឹងមុនផុតកំណត់ (Flyway V13) |
+| **24** | **Cycle Public Summary** | សេចក្តីសង្ខេបវគ្គហ៊ុយសាធារណៈសម្រាប់សមាជិក តម្លាភាពនៃលទ្ធផលបិទវគ្គ |
+| **25** | **Settings & Rule Presets** | គ្រប់គ្រងកញ្ចប់សេវាកម្ម, ច្របល់លំដាប់នៃការដាក់ដេញថ្លៃ, កំណត់ហេតុនៃការផ្លាស់ប្តូរ, ការសាកល្បងឆ្លងកាត់ |
+| **26** | **Multi-Currency Hardening** | គាំទ្រ USD/KHR តាម exponent, ការបង្គត់តាមស្តង់ដារហិរញ្ញវត្ថុ, គ្រប់គ្រងស្ថានភាពរូបិយប័ណ្ណ |
+| **27** | **Cycle Settings UI** | ចំណុចប្រទាក់កំណត់រចនាសម្ព័ន្ធវគ្គហ៊ុយកម្រិតខ្ពស់, ប្រអប់ជម្រើសប៉ារ៉ាម៉ែត្រ និងការបញ្ចូលទិន្នន័យងាយស្រួល |
+| **28** | **Hermetic Tests & Release Gate** | Testcontainers ដាច់ដោយឡែកពី DB dev, ReleaseGateTests រារាំងលេខទសភាគ, សំណុំសាកល្បងទាំងមូលជោគជ័យ |
+| **29** | **Late Fees Delivery** | ប្រមូលថ្លៃផាកពិន័យយឺត, បិទសៀវភៅដោយស្វ័យប្រវត្តិ, ការតំរង់ជួរទូទាត់, បង្ហាញពេញលេញនៅលើសៀវភៅគណនេយ្យ & របាយការណ៍ (Flyway V14) |
+| **30** | **CSV / Excel Exports** | នាំចេញសៀវភៅគណនេយ្យ, របាយការណ៍ថ្លៃម្ចាស់ហ៊ុយ & របាយការណ៍សមាជិកទៅជា **CSV** និង **XLSX (Apache POI)** — ជួរឈរពេញលេញ ជួរ TOTAL, ការពារប្រឆាំងនឹងការបញ្ចូលរូបមន្ត |
+| **31** | **Wrap-up & Cleanup** | សម្អាតឯកសារហួសសម័យ (README, លិបិក្រម, ស្ថាបត្យកម្ម), ផ្ទៀងផ្ទាត់ប្រព័ន្ធទាំងមូលតាមរយៈ Docker compose, ពិនិត្យសំណុំសាកល្បង + ការចងក្រងចុងក្រោយ |
 
 ---
 
-## 💳 Tích Hợp Cổng Thanh Toán ABA PayWay & Gói Cước SaaS (Step 19)
+## 💳 ការរួមបញ្ចូលច្រកទូទាត់ ABA PayWay និងកញ្ចប់សេវាកម្ម SaaS (ជំហានទី 19)
 
-Hệ thống hỗ trợ mô hình kinh doanh phần mềm dịch vụ (SaaS) toàn diện:
-- **Tự Động Tặng 1 Tháng Dùng Thử**: Khi Chủ Hụi đăng ký mới, hệ thống tự động kích hoạt 30 ngày dùng thử miễn phí (`TRIAL`), theo dõi số ngày còn lại và hiển thị cảnh báo gia hạn khi hết hạn.
-- **Tích Hợp Cổng Thanh Toán ABA PayWay**:
-  - Tuân thủ đặc tả kỹ thuật chính thức tại [developer.payway.com.kh](https://developer.payway.com.kh/).
-  - Mã hóa bảo mật chữ ký điện tử HMAC-SHA512.
-  - Hỗ trợ thanh toán nhanh qua **ABA Pay KHQR** (Bakong) và thẻ quốc tế Visa/Mastercard/JCB.
-  - Cơ chế Webhook Callback, tra cứu giao dịch và mô phỏng thanh toán Sandbox phục vụ kiểm thử.
-- **Trung Tâm Quản Trị Hệ Thống (Administrator Control Panel)**:
-  - Truy cập tại `/admin` dành riêng cho vai trò `ADMIN` (`0900999999` / `admin1234`).
-  - Cấu hình thông số Merchant ID, API Hash Key, Purchase URL, Check URL, Sandbox Mode.
-  - Quản trị danh mục gói cước đăng ký (Thêm, Sửa, Xóa, Bật/Tắt, Định giá theo USD/KHR/VND).
-  - Quản lý danh sách Chủ Hụi và gia hạn gói dịch vụ thủ công (+30 ngày, +1 năm, VIP vĩnh viễn).
-  - Sổ nhật ký giao dịch thanh toán PayWay thời gian thực.
+ប្រព័ន្ធគាំទ្រគំរូអាជីវកម្មកម្មវិធីជាសេវាកម្ម (SaaS) ពេញលេញ៖
+- **ផ្តល់ 1 ខែប្រើប្រាស់ដោយឥតគិតថ្លៃដោយស្វ័យប្រវត្តិ**៖ នៅពេលម្ចាស់ហ៊ុយចុះឈ្មោះថ្មី ប្រព័ន្ធនឹងបើកដំណើរការការប្រើប្រាស់រយៈពេល 30 ថ្ងៃដោយឥតគិតថ្លៃ (`TRIAL`) តាមដានចំនួនថ្ងៃដែលនៅសល់ ហើយបង្ហាញការព្រមានអំពីការបន្តការប្រើប្រាស់នៅពេលផុតកំណត់។
+- **ការរួមបញ្ចូលច្រកទូទាត់ ABA PayWay**៖
+  - អនុលោមតាមលក្ខណៈបច្ចេកទេសផ្លូវការនៅ [developer.payway.com.kh](https://developer.payway.com.kh/)។
+  - អ៊ិនគ្រីបហត្ថលេខាឌីជីថល HMAC-SHA512 ដើម្បីសុវត្ថិភាព។
+  - គាំទ្រការទូទាត់រហ័សតាមរយៈ **ABA Pay KHQR** (Bakong) និងប័ណ្ណអន្តរជាតិ Visa/Mastercard/JCB។
+  - យន្តការ Webhook Callback, ស្វែងរកប្រតិបត្តិការ និងការក្លែងធ្វើការទូទាត់ Sandbox សម្រាប់ការសាកល្បង។
+- **មជ្ឈមណ្ឌលគ្រប់គ្រងប្រព័ន្ធ (Administrator Control Panel)**៖
+  - ចូលប្រើប្រាស់នៅ `/admin` សម្រាប់តែតួនាទី `ADMIN` (`0900999999` / `admin1234`)។
+  - កំណត់ប៉ារ៉ាម៉ែត្រ Merchant ID, API Hash Key, Purchase URL, Check URL, Sandbox Mode។
+  - គ្រប់គ្រងបញ្ជីកញ្ចប់សេវាកម្មដែលអាចចុះឈ្មោះ (បន្ថែម កែ លុប បើក/បិទ កំណត់តម្លៃតាម USD/KHR/VND)។
+  - គ្រប់គ្រងបញ្ជីម្ចាស់ហ៊ុយ និងបន្តការប្រើប្រាស់សេវាកម្មដោយដៃ (+30 ថ្ងៃ, +1 ឆ្នាំ, VIP ជាអចិន្ត្រៃយ៍)។
+  - សៀវភៅកំណត់ហេតុប្រតិបត្តិការទូទាត់ PayWay តាមពេលវេលាជាក់ស្តែង។
 
 ---
 
-## 📄 Bản Quyền & Giấy Phép (License)
+## 📄 រក្សាសិទ្ធិ និងអាជ្ញាប័ណ្ណ (License)
 
-Dự án thuộc quyền sở hữu trí tuệ của nhóm phát triển Tong Tin ROSCA Management System.
-Mọi thắc mắc và đóng góp vui lòng tham khảo chi tiết tại thư mục [`docs/`](docs/).
+គម្រោងនេះជាកម្មសិទ្ធិបញ្ញារបស់ក្រុមអភិវឌ្ឍន៍ប្រព័ន្ធគ្រប់គ្រង Tong Tin ROSCA Management System។
+រាល់សំណួរ និងការចូលរួមវិភាគទានសូមមើលព័ត៌មានលម្អិតនៅថតឯកសារ [`docs/`](docs/)។
