@@ -25,3 +25,4 @@ app:
   rate-limit:
     register-per-hour: 20
     login-per-15min: 30
+    callback-per-minute: 60

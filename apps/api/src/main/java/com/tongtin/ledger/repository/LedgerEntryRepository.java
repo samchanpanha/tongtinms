@@ -67,4 +67,18 @@ public interface LedgerEntryRepository extends JpaRepository<LedgerEntry, Long> 
                                                       @Param("shareIds") Collection<Long> shareIds,
                                                       @Param("types") Collection<String> types,
                                                       @Param("status") String status);
+
+    /**
+     * Step 29: cumulative LATE_FEE already charged for one source obligation.
+     * Backed by idx_ledger_late_fee_cycle_share (V14).
+     */
+    @Query("""
+            SELECT COALESCE(SUM(e.amountMinor), 0)
+            FROM LedgerEntry e
+            WHERE e.cycleId = :cycleId AND e.shareId = :shareId AND e.type = 'LATE_FEE'
+            """)
+    long sumLateFeeByCycleAndShare(@Param("cycleId") Long cycleId, @Param("shareId") Long shareId);
+
+    @Query("SELECT e.status FROM LedgerEntry e WHERE e.id = :id")
+    Optional<String> findStatusById(@Param("id") Long id);
 }

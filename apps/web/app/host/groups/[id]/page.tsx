@@ -24,6 +24,7 @@ import {
   Clock,
   X,
   CreditCard,
+  Download,
 } from "lucide-react";
 
 type GroupDetails = Awaited<ReturnType<typeof api.getGroup>>;
@@ -49,6 +50,8 @@ export default function GroupDetailPage({
   const [activeTab, setActiveTab] = useState<"shares" | "cycles" | "payments">("cycles");
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   // Modals & form state
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -118,6 +121,34 @@ export default function GroupDetailPage({
       reloadAll();
     } catch (err: unknown) {
       setActionError(err instanceof Error ? err.message : t.hostGroupDetail.msgOpenCycleError);
+    }
+  };
+
+  const handleAssessLateFees = async () => {
+    setActionError(null);
+    setActionSuccess(null);
+    try {
+      const res = await api.assessLateFees(id);
+      if (res.created > 0) {
+        setActionSuccess(t.hostGroupDetail.msgLateFeeSuccess(res.created));
+      } else {
+        setActionSuccess(t.hostGroupDetail.msgLateFeeNothing);
+      }
+      reloadAll();
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : t.hostGroupDetail.msgLateFeeError);
+    }
+  };
+
+  const handleProfitExport = async (format: "csv" | "xlsx") => {
+    setExportError(null);
+    setExporting(true);
+    try {
+      await api.exportProfit(id, format);
+    } catch (err: unknown) {
+      setExportError(err instanceof Error ? err.message : t.hostGroupDetail.exportError);
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -362,6 +393,34 @@ export default function GroupDetailPage({
       {/* Tab 1: Cycles & Bidding */}
       {activeTab === "cycles" && (
         <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h3 className="font-bold text-base text-zinc-900 dark:text-zinc-50">
+              {t.hostGroupDetail.profitExportHeader}
+            </h3>
+            <div className="flex shrink-0 flex-col items-end gap-1.5">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => handleProfitExport("csv")}
+                  disabled={exporting}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 cursor-pointer disabled:opacity-50 dark:border-emerald-700/60 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/70"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  {t.hostGroupDetail.exportProfitCsv}
+                </button>
+                <button
+                  onClick={() => handleProfitExport("xlsx")}
+                  disabled={exporting}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 cursor-pointer disabled:opacity-50 dark:border-emerald-700/60 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/70"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  {t.hostGroupDetail.exportProfitXlsx}
+                </button>
+              </div>
+              {exportError && (
+                <span className="text-xs text-red-600 dark:text-red-400">{exportError}</span>
+              )}
+            </div>
+          </div>
           {cycles.length === 0 ? (
             <EmptyState
               icon={Clock}
@@ -541,9 +600,20 @@ export default function GroupDetailPage({
             <h3 className="font-bold text-base text-zinc-900 dark:text-zinc-50">
               {t.hostGroupDetail.paymentsHeader}
             </h3>
-            <span className="text-xs text-zinc-500">
-              {t.hostGroupDetail.totalPending(debts.length)}
-            </span>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-zinc-500">
+                {t.hostGroupDetail.totalPending(debts.length)}
+              </span>
+              {group.lateFeeType !== "NONE" && (
+                <button
+                  onClick={handleAssessLateFees}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100 cursor-pointer dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-300 dark:hover:bg-amber-950/70"
+                >
+                  <Clock className="h-3.5 w-3.5" />
+                  {t.hostGroupDetail.assessLateFeesBtn}
+                </button>
+              )}
+            </div>
           </div>
 
           {debts.length === 0 ? (

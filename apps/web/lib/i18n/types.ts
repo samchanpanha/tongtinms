@@ -371,6 +371,14 @@ export interface Translations {
     colDueDate: string;
     colActions: string;
     collectMoneyBtn: string;
+    assessLateFeesBtn: string;
+    msgLateFeeSuccess: (count: number) => string;
+    msgLateFeeNothing: string;
+    msgLateFeeError: string;
+    profitExportHeader: string;
+    exportProfitCsv: string;
+    exportProfitXlsx: string;
+    exportError: string;
     assignModalTitle: string;
     selectMemberLabel: string;
     selectMemberPlaceholder: string;
@@ -437,6 +445,9 @@ export interface Translations {
     dirOut: string;
     recipientMember: (memberName: string, shareNo: number | null) => string;
     recipientHost: string;
+    exportCsv: string;
+    exportXlsx: string;
+    exportError: string;
   };
   memberPortal: {
     defaultError: string;
@@ -494,6 +505,10 @@ export interface Translations {
     entryPayout: string;
     emptyStatementTitle: string;
     emptyStatementDesc: string;
+    statementExportHeader: string;
+    exportStatementCsv: string;
+    exportStatementXlsx: string;
+    exportError: string;
   };
   subscription: {
     title: string;
@@ -538,6 +553,7 @@ export interface Translations {
     paymentSuccess: string;
     paymentSuccessDesc: string;
     paymentError: string;
+    paymentCancelled: string;
     headerEyebrow: string;
     refreshBtn: string;
     trialPlanName: string;
@@ -562,6 +578,16 @@ export interface Translations {
     tabPlans: string;
     tabHosts: string;
     tabOrders: string;
+    tabInsights: string;
+    insightsTitle: string;
+    insightsRevenueTitle: string;
+    insightsCohortTitle: string;
+    colMonth: string;
+    colPaidOrders: string;
+    colRevenue: string;
+    colRegistered: string;
+    colActiveNow: string;
+    colChurned: string;
     saveSettingsBtn: string;
     settingsSavedSuccess: string;
     configuredBadge: string;

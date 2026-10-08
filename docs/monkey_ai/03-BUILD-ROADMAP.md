@@ -3,13 +3,13 @@
 Rules:
 - Do exactly one step per coding session unless the user asks for more
 - Do not skip formula tests
-- Update `docs/STATUS.md` when a step is done
+- Update `docs/monkey_ai/STATUS.md` when a step is done
 - Commit only when the user asks
 
 ## Extra product ideas (parked, not MVP)
 
 P1. VietQR payment reference on each obligation
-P2. Excel/PDF so sach export matching paper books
+P2. PDF sổ sách matching paper books — CSV/XLSX export released in Step 30; PDF print/visual templates still parked
 P3. Zalo OA and Telegram reminders
 P4. Guarantor and deposit to reduce hoi vo
 P5. Member reputation across groups
@@ -127,3 +127,32 @@ Audit log, authz tests, money rounding tests, seed demo data.
 Vietnamese copy, VND formatting, empty states, allowedHosts, start script.
 
 Do not implement a later step before the previous step is accepted.
+
+---
+
+## Post-MVP track — Steps 18–31 (executed 2026-10-07 → 2026-10-08)
+
+The MVP (00–17) is done. The approved track A+B above it was executed one step per
+session. The live tracker is `docs/monkey_ai/STATUS.md` (current step) and the root
+`plan.md` (full step log, §0 status rows and §1–§19 records).
+
+| Step | Done | What shipped |
+|:---:|:---:|---|
+| 18 | ✅ | Final delivery: 10 E2E flow checks, handover docs |
+| 19 | ✅ | SaaS subscriptions + ABA PayWay (HMAC-SHA512, KHQR/card), Admin panel, Flyway V11 |
+| 20 | ✅ | Settings module — `system_settings`, parameter presets for new groups |
+| 21 | ✅ | Bid rules: interest ceiling, round-2 tiebreak bidding, payout spread over bid rounds |
+| 22 | ✅ | Late fee / early-withdrawal formulas, transparent in ledger |
+| 23 | ✅ | Subscription funnel — plans gating (PLUS/PREMIUM), group limits, renewals, Flyway V13 |
+| 24 | ✅ | Cycle public summary for members |
+| 25 | ✅ | Settings & rule presets — plan pricing, bid-order shuffle, change history, cross-tests |
+| 26 | ✅ | Multi-currency hardening — USD/KHR exponents, financial rounding, currency state control |
+| 27 | ✅ | Cycle settings UI — advanced group config screens |
+| 28 | ✅ | Hermetic tests (Testcontainers) + ReleaseGateTests (no `float`/`double` in main source) |
+| 29 | ✅ | Late fees delivery — fee collection, auto settlement, payment queuing, ledger/statement display, Flyway V14 |
+| 30 | ✅ | CSV / Excel exports — ledger, host profit, member statement via Apache POI (`com.tongtin.reports.export`) |
+| 31 | ⟳ | Wrap-up & cleanup — stale docs (README/index/architecture/roadmap), Docker compose click-through, final suite + build (this session) |
+
+Parked P-items are unchanged and remain parked unless the user asks. §7.5 formula
+reminders (ranks 6–7) are recorded in `plan.md` and **need explicit user confirmation**
+before any change is made.

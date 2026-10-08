@@ -40,6 +40,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
+import static org.hamcrest.Matchers.startsWith;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -185,6 +186,73 @@ public class SubscriptionAndPayWayTests {
         assertEquals(hostOwnerId, order.getOwnerId());
         assertEquals(selectedPlan.id(), order.getPlanId());
         assertEquals("ABA_PAYWAY", order.getPaymentGateway());
+    }
+
+    @Test
+    @DisplayName("Checkout return URLs are absolute and carry the transaction id")
+    void testCheckoutReturnUrlsCarryTranId() {
+        SubscriptionPlanDto plan = subscriptionService.getActivePlans().get(0);
+        PayWayCheckoutResponse checkout = subscriptionService.checkoutPayWay(
+                hostUserId, hostOwnerId,
+                new PayWayCheckoutRequest(plan.id(), null, "http://localhost:3000/host/subscription", null, null),
+                "http://localhost:3000");
+
+        String base = "http://localhost:3000/host/subscription";
+        assertEquals(base + "?status=success&tran_id=" + checkout.tranId(), checkout.returnUrl());
+        assertEquals(base + "?status=success&tran_id=" + checkout.tranId(), checkout.continueSuccessUrl());
+        assertEquals(base + "?status=cancelled&tran_id=" + checkout.tranId(), checkout.cancelUrl());
+        assertEquals(checkout.returnUrl(), checkout.formFields().get("return_url"));
+    }
+
+    @Test
+    @DisplayName("Checkout derives absolute return URLs from the request Origin when none is supplied")
+    void testCheckoutDerivesReturnUrlFromOrigin() {
+        SubscriptionPlanDto plan = subscriptionService.getActivePlans().get(0);
+        PayWayCheckoutResponse checkout = subscriptionService.checkoutPayWay(
+                hostUserId, hostOwnerId,
+                new PayWayCheckoutRequest(plan.id(), null, null, null, null),
+                "http://localhost:3000");
+
+        assertEquals("http://localhost:3000/host/subscription?status=success&tran_id=" + checkout.tranId(),
+                checkout.returnUrl());
+        assertTrue(checkout.cancelUrl()
+                .startsWith("http://localhost:3000/host/subscription?status=cancelled&tran_id="));
+    }
+
+    @Test
+    @DisplayName("Security: cross-origin return URLs are rejected")
+    void testCheckoutRejectsCrossOriginReturnUrl() {
+        SubscriptionPlanDto plan = subscriptionService.getActivePlans().get(0);
+        PayWayCheckoutRequest req = new PayWayCheckoutRequest(
+                plan.id(), null, "https://evil.example.com/host/subscription", null, null);
+        assertThrows(com.tongtin.common.errors.BadRequestException.class,
+                () -> subscriptionService.checkoutPayWay(hostUserId, hostOwnerId, req, "http://localhost:3000"));
+    }
+
+    @Test
+    @DisplayName("Security: return URLs cannot smuggle status or tran_id parameters")
+    void testCheckoutRejectsReturnUrlWithStatusParam() {
+        SubscriptionPlanDto plan = subscriptionService.getActivePlans().get(0);
+        PayWayCheckoutRequest req = new PayWayCheckoutRequest(
+                plan.id(), null, "http://localhost:3000/host/subscription?status=success", null, null);
+        assertThrows(com.tongtin.common.errors.BadRequestException.class,
+                () -> subscriptionService.checkoutPayWay(hostUserId, hostOwnerId, req, "http://localhost:3000"));
+    }
+
+    @Test
+    @DisplayName("Checkout endpoint composes the return URL from the Origin header")
+    void testCheckoutEndpointUsesOriginHeader() throws Exception {
+        SubscriptionPlanDto plan = subscriptionService.getActivePlans().get(0);
+        String hostToken = jwtService.accessToken(hostUserId, hostOwnerId, List.of("HOST"));
+
+        mockMvc.perform(post("/api/v1/subscription/checkout/payway")
+                        .header("Authorization", "Bearer " + hostToken)
+                        .header("Origin", "http://localhost:3000")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"planId\":" + plan.id() + "}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.returnUrl",
+                        startsWith("http://localhost:3000/host/subscription?status=success&tran_id=")));
     }
 
     @Test

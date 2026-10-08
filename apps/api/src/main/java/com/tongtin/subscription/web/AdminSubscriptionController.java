@@ -1,6 +1,7 @@
 package com.tongtin.subscription.web;
 
 import com.tongtin.common.security.AuthPrincipal;
+import com.tongtin.subscription.dto.AdminInsightsDto;
 import com.tongtin.subscription.dto.ExtendSubscriptionRequest;
 import com.tongtin.subscription.dto.HostAdminViewDto;
 import com.tongtin.subscription.dto.PayWaySettingsDto;
@@ -77,6 +78,12 @@ public class AdminSubscriptionController {
     @GetMapping("/orders")
     public List<SubscriptionOrder> getOrders() {
         return subscriptionService.getAdminOrdersList();
+    }
+
+    // 5. Insights — revenue per plan + registration cohorts (Step 27)
+    @GetMapping("/insights")
+    public AdminInsightsDto getInsights() {
+        return subscriptionService.getAdminInsights();
     }
 
     // 4. PayWay Settings & Configuration

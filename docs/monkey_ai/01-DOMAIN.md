@@ -270,6 +270,23 @@ if lateFeeType == PERCENT_PER_DAY:
 
 Late fee creates a new LedgerEntry. It does not rewrite the original obligation.
 
+Step 29 semantics (host-triggered assessment):
+
+- Applies to **CONTRIBUTION** obligations only (UNPAID/PARTIAL, `due_at < now`).
+  Payout and host-fee obligations are never late-fee'd — the host is the debtor there.
+- `principal` = the contribution's `amount_minor` (the full stake), `overdueDays` =
+  whole days since `due_at`. Rounding is half-up integer:
+  `(principal * lateFeeValue * overdueDays + 50) / 100`.
+- The fee row is `type = LATE_FEE`, `direction = IN` (money owed by the member, like
+  a contribution), `status = UNPAID`, and copies the source obligation's `due_at` so it
+  surfaces in the overdue debts list immediately.
+- Assessment is **cumulative and idempotent**: `target = lateFee(...)` (FIXED: the
+  fixed value once; PERCENT_PER_DAY: grows with overdueDays). Rows already written for
+  that (cycle, share) are summed and only the positive delta is inserted — re-running
+  the same day writes nothing. LATE_FEE rows themselves are never fee'd again.
+- Triggered explicitly by the host (`POST /groups/{id}/late-fees/assess`); `lateFeeType
+  = NONE` is a no-op. No automatic/scheduled assessment in MVP.
+
 ## 10. Ledger rules
 
 Ledger is append-only.
@@ -349,3 +366,11 @@ Member cannot see:
 - host-only profit notes
 
 Host can see everything in their groups.
+
+Export parity (Step 30):
+- an export file contains exactly the same fields and passes exactly the same
+  permission checks as its JSON report endpoint; exporting exposes nothing new
+- member exports cover own shares only and never contain host fee or host
+  profit numbers
+- exports are point-in-time snapshots of a report; the append-only ledger
+  stays the source of truth and the JSON endpoints remain live

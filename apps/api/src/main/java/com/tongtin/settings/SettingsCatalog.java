@@ -47,7 +47,11 @@ public final class SettingsCatalog {
                             "Số ngày ân hạn sau khi gói hết hạn trước khi bị khóa tạo dây mới", "3", 0, 30),
                     SettingDefinition.numericList("subscription_reminder_days", SUBSCRIPTION,
                             "Mốc nhắc gia hạn (ngày)",
-                            "Các mốc nhắc trước khi gói hết hạn, cách nhau bởi dấu phẩy", "7,3,1", 1, 90))),
+                            "Các mốc nhắc trước khi gói hết hạn, cách nhau bởi dấu phẩy", "7,3,1", 1, 90),
+                    SettingDefinition.numeric("checkout_pending_reuse_minutes", SUBSCRIPTION,
+                            "Thời gian dùng lại đơn chờ",
+                            "Phút giữ đơn thanh toán đang chờ để tránh tạo đơn trùng khi bấm lặp lại (0 = tắt)",
+                            "10", 0, 60))),
             new Category(GROUPS, "Dây hụi", List.of(
                     SettingDefinition.numeric("default_bid_close_offset_days", GROUPS, "Ngày khóa ký mặc định",
                             "Số ngày từ khi mở ký đến khi khóa nhận ký, dùng khi tạo dây hụi không nhập",
@@ -60,7 +64,10 @@ public final class SettingsCatalog {
                     SettingDefinition.numeric("rate_limit_register_per_hour", SECURITY, "Giới hạn đăng ký mỗi giờ",
                             "Số lần đăng ký tối đa từ một IP trong một giờ", "20", 1, 1000),
                     SettingDefinition.numeric("rate_limit_login_per_15min", SECURITY, "Giới hạn đăng nhập mỗi 15 phút",
-                            "Số lần đăng nhập tối đa từ một IP trong 15 phút", "30", 1, 1000))));
+                            "Số lần đăng nhập tối đa từ một IP trong 15 phút", "30", 1, 1000),
+                    SettingDefinition.numeric("rate_limit_payway_callback_per_minute", SECURITY,
+                            "Giới hạn callback PayWay mỗi phút",
+                            "Số lần webhook callback PayWay tối đa từ một IP trong một phút", "60", 1, 1000))));
 
     private static final Map<String, SettingDefinition> BY_KEY = indexByKey();
 

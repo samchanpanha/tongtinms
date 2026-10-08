@@ -16,6 +16,7 @@ import {
   AlertCircle,
   Loader2,
   Send,
+  Download,
 } from "lucide-react";
 
 type MyGroup = Awaited<ReturnType<typeof api.getMyGroups>>[number];
@@ -42,6 +43,22 @@ export default function MemberGroupDetailPage({
   const [bidLoading, setBidLoading] = useState(false);
   const [bidError, setBidError] = useState<string | null>(null);
   const [bidSuccess, setBidSuccess] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  const handleStatementExport = async (format: "csv" | "xlsx") => {
+    setExportError(null);
+    setExporting(true);
+    try {
+      await api.exportStatement(id, format);
+    } catch (err: unknown) {
+      setExportError(
+        err instanceof Error ? err.message : t.memberGroupDetail.exportError
+      );
+    } finally {
+      setExporting(false);
+    }
+  };
 
   useEffect(() => {
     let ignore = false;
@@ -311,10 +328,38 @@ export default function MemberGroupDetailPage({
 
       {/* Tab 2: Personal Statement */}
       {activeTab === "statement" && (
-        <div className="space-y-6">
+<div className="space-y-6">
           {statement ? (
             <>
-              {/* Summary Metrics */}
+              {/* Export actions */}
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-base text-zinc-900 dark:text-zinc-50">
+                  {t.memberGroupDetail.statementExportHeader}
+                </h3>
+                <div className="flex shrink-0 flex-col items-end gap-1.5">
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => handleStatementExport("csv")}
+                      disabled={exporting}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 cursor-pointer disabled:opacity-50 dark:border-emerald-700/60 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/70"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      {t.memberGroupDetail.exportStatementCsv}
+                    </button>
+                    <button
+                      onClick={() => handleStatementExport("xlsx")}
+                      disabled={exporting}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 cursor-pointer disabled:opacity-50 dark:border-emerald-700/60 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/70"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      {t.memberGroupDetail.exportStatementXlsx}
+                    </button>
+                  </div>
+                  {exportError && (
+                    <span className="text-xs text-red-600 dark:text-red-400">{exportError}</span>
+                  )}
+                </div>
+              </div>
               {statement.totals && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                   <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60">

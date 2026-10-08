@@ -159,4 +159,53 @@ class FormulaEngineTests {
     private boolean BIDDING(String preset) {
         return !FIXED.equals(preset);
     }
+
+    // ---- Step 29: lateFee (01-DOMAIN 9.6) ----
+
+    @Test
+    void lateFeeNoneIsZero() {
+        assertThat(FormulaEngine.lateFee("NONE", 20_000, 800_000, 5)).isZero();
+    }
+
+    @Test
+    void lateFeeFixedChargesOnceRegardlessOfDays() {
+        assertThat(FormulaEngine.lateFee("FIXED", 20_000, 800_000, 1)).isEqualTo(20_000L);
+        assertThat(FormulaEngine.lateFee("FIXED", 20_000, 800_000, 30)).isEqualTo(20_000L);
+        assertThat(FormulaEngine.lateFee("FIXED", 0, 800_000, 30)).isZero();
+    }
+
+    @Test
+    void lateFeePercentPerDayGrowsLinearly() {
+        // (800000 * 2 * 3 + 50) / 100 = 48000
+        assertThat(FormulaEngine.lateFee("PERCENT_PER_DAY", 2, 800_000, 3)).isEqualTo(48_000L);
+        assertThat(FormulaEngine.lateFee("PERCENT_PER_DAY", 2, 800_000, 0)).isZero();
+    }
+
+    @Test
+    void lateFeePercentRoundsHalfUp() {
+        // raw = 150 -> (150 + 50) / 100 = 2  (1.5 rounds up)
+        assertThat(FormulaEngine.lateFee("PERCENT_PER_DAY", 1, 150, 1)).isEqualTo(2L);
+        // raw = 149 -> (149 + 50) / 100 = 1  (1.49 rounds down)
+        assertThat(FormulaEngine.lateFee("PERCENT_PER_DAY", 1, 149, 1)).isEqualTo(1L);
+        // raw = 50 -> (50 + 50) / 100 = 1  (0.5 rounds up)
+        assertThat(FormulaEngine.lateFee("PERCENT_PER_DAY", 1, 50, 1)).isEqualTo(1L);
+        // raw = 49 -> (49 + 50) / 100 = 0
+        assertThat(FormulaEngine.lateFee("PERCENT_PER_DAY", 1, 49, 1)).isZero();
+    }
+
+    @Test
+    void lateFeeRejectsNegativeInputs() {
+        assertThatThrownBy(() -> FormulaEngine.lateFee("FIXED", -1, 800_000, 3))
+                .isInstanceOf(FormulaException.class);
+        assertThatThrownBy(() -> FormulaEngine.lateFee("FIXED", 20_000, -1, 3))
+                .isInstanceOf(FormulaException.class);
+        assertThatThrownBy(() -> FormulaEngine.lateFee("PERCENT_PER_DAY", 2, 800_000, -1))
+                .isInstanceOf(FormulaException.class);
+    }
+
+    @Test
+    void lateFeeRejectsUnknownType() {
+        assertThatThrownBy(() -> FormulaEngine.lateFee("WEEKLY", 2, 800_000, 3))
+                .isInstanceOf(FormulaException.class);
+    }
 }

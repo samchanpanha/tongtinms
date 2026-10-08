@@ -1,10 +1,12 @@
 package com.tongtin.ledger.payments.web;
 
 import com.tongtin.common.security.AuthPrincipal;
+import com.tongtin.ledger.dto.LateFeeAssessResponse;
 import com.tongtin.ledger.payments.dto.DebtResponse;
 import com.tongtin.ledger.payments.dto.PaymentCreateRequest;
 import com.tongtin.ledger.payments.dto.PaymentResponse;
 import com.tongtin.ledger.payments.service.PaymentService;
+import com.tongtin.ledger.service.LateFeeService;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.http.HttpStatus;
@@ -25,9 +27,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class PaymentController {
 
     private final PaymentService paymentService;
+    private final LateFeeService lateFeeService;
 
-    public PaymentController(PaymentService paymentService) {
+    public PaymentController(PaymentService paymentService, LateFeeService lateFeeService) {
         this.paymentService = paymentService;
+        this.lateFeeService = lateFeeService;
     }
 
     @PostMapping("/groups/{id}/payments")
@@ -47,5 +51,11 @@ public class PaymentController {
     public List<DebtResponse> debts(@AuthenticationPrincipal AuthPrincipal principal,
                                     @PathVariable Long id) {
         return paymentService.debts(principal.ownerId(), id);
+    }
+
+    @PostMapping("/groups/{id}/late-fees/assess")
+    public ResponseEntity<LateFeeAssessResponse> assessLateFees(@AuthenticationPrincipal AuthPrincipal principal,
+                                                                @PathVariable Long id) {
+        return ResponseEntity.ok(lateFeeService.assess(principal.userId(), principal.ownerId(), id));
     }
 }

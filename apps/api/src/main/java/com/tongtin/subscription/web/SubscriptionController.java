@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -44,8 +45,9 @@ public class SubscriptionController {
     @PreAuthorize("hasRole('HOST')")
     public PayWayCheckoutResponse checkoutPayWay(
             @AuthenticationPrincipal AuthPrincipal principal,
-            @Valid @RequestBody PayWayCheckoutRequest request) {
-        return subscriptionService.checkoutPayWay(principal.userId(), principal.ownerId(), request);
+            @Valid @RequestBody PayWayCheckoutRequest request,
+            @RequestHeader(value = "Origin", required = false) String origin) {
+        return subscriptionService.checkoutPayWay(principal.userId(), principal.ownerId(), request, origin);
     }
 
     @PostMapping("/verify/{tranId}")

@@ -30,6 +30,7 @@ Later extract: notification service, identity service.
 | Tests | JUnit + AssertJ for formula engine |
 | Package | Docker Compose |
 | Money | Java `long` minor units + CHAR(3) currency, never `double` |
+| Export | Apache POI (XLSX) + RFC 4180 CSV (UTF-8 BOM) |
 
 Frontend talks only to `/api`.
 Backend listens internally (example 8080).
@@ -39,18 +40,25 @@ Preview exposes Next.js port only.
 
 ```
 com.tongtin
-  common        id, money, time, errors
-  identity      users, roles, JWT
+  common        id, money (minor-unit long), time, errors, security (JWT), audit events, health
+  identity      users, roles, JWT, owner self-register
   members       member profiles
   groups        groups, shares, invites
-  cycles        cycle state machine
-  bidding       sealed bids, winner selection
-  ledger        formulas, obligations, payments
+  cycles        cycle state machine + sealed bids (cycles/bids) + close-and-calculate
+  ledger        formulas, obligations, payments (ledger/payments), late fees
+  dashboard     host KPI dashboard
+  reports       ledger / host profit / member statement + CSV & XLSX export (reports/export)
   notify        in-app notifications
-  audit         audit events
+  memberportal  member portal (member-facing `/api/v1/me/...`)
   subscription  plans, orders, ABA PayWay, lifecycle job
   settings      system_settings entity, catalog registry, typed reads
+  demo          demo fixture seeder
 ```
+
+As built: sealed bidding lives in `cycles/bids` (part of the cycle state machine),
+payments in `ledger/payments`, and audit events in `common/audit`. `reports` gained
+the `export` subpackage in Step 30 (`CsvRenderer`, `XlsxRenderer` via Apache POI,
+`ExportService`, `ExportTables`). `memberportal` is the member-only `/api/v1/me` surface.
 
 `settings` (Step 20) owns the `system_settings` table and the
 `SettingsCatalog` registry — the single source of truth for every runtime
@@ -128,6 +136,15 @@ subscription_plans (V11)
 subscription_orders (V11)
   id, owner_id, plan_id, tran_id unique, amount_minor, currency,
   status, expires_at, created_at, updated_at
+
+payment_events (V12, Step 25 — append-only payment forensics)
+  id, tran_id nullable, source (CALLBACK | CHECK), outcome
+  (RATE_LIMITED / MISSING_TRAN_ID / ORDER_* / ERROR for CALLBACK;
+  APPROVED | NOT_APPROVED for CHECK), payload TEXT (raw JSON,
+  truncated 8000 chars), remote_ip nullable, created_at.
+  Insert-only by design (repository exposes no update/delete);
+  survives callback failures because each record() commits outside
+  the verify transaction when no transaction is active.
 ```
 
 Indexes:
@@ -140,6 +157,13 @@ Indexes:
 - member_profiles.phone unique per owner_id
 - money columns are BIGINT minor units; reports must select currency + exponent
 - subscription_orders.tran_id unique; idx_sub_orders_owner; idx_sub_orders_tran_id
+- payment_events (tran_id, created_at DESC)
+- owner_accounts (subscription_ends_at, subscription_status) — V13, Step 27;
+  serves the daily lifecycle-job scan
+  (`findBySubscriptionEndsAtBeforeAndSubscriptionStatusNotIn`)
+- ledger_entries (cycle_id, share_id) WHERE type = 'LATE_FEE' — V14, Step 29;
+  speeds up the "already charged" delta sum during late-fee assessment
+  (groups.late_fee_type / late_fee_value themselves existed since V3)
 
 ## 5. API outline
 
@@ -183,6 +207,11 @@ Cycles:
 Payments:
 - POST `/groups/{id}/payments`
 - GET `/groups/{id}/debts`
+- POST `/groups/{id}/late-fees/assess`  (HOST, Step 29) scan overdue CONTRIBUTION
+  obligations of my group and append LATE_FEE delta rows per 01 §9.6; returns
+  `{assessed, created, entries[]}` (entry = ledgerEntryId, cycleId, shareId,
+  amountMinor, currency, dueAt). Idempotent: same-day re-run creates nothing;
+  `lateFeeType = NONE` → `{0, 0, []}`. GET stays read-only (assessment is explicit).
 
 Host dashboard (Step 12):
 - GET `/host/dashboard`   owner-scoped summary: my groups (id, code, name, type, status,
@@ -360,10 +389,40 @@ Public / host:
 - GET  `/subscription/my-status`        own subscription status + trial/grace info
 - POST `/subscription/checkout/payway`  create order -> PayWay purchase URL
   (tran_id `TT_<ownerId>_<uuid10>`); returns paywayUrl + fields
+  Return-flow contract (Step 24, decision 2026-10-08): the gateway needs
+  ABSOLUTE return URLs, so the web client passes its own origin
+  (`returnUrl` = `<origin>/host/subscription`) and the server composes
+  `return_url` = base + `?status=success&tran_id=...`,
+  `continue_success_url` = base + `?status=success&tran_id=...`,
+  `cancel_url` = base + `?status=cancelled&tran_id=...`.
+  Server validates any client-supplied absolute URL against the request
+  `Origin` header (scheme http/https, host+port must match; path-only
+  URLs resolve against Origin); rejects `status=`/`tran_id=` already in
+  the query. Without Origin (tests/curl) relative defaults are kept.
+  Landing on `/host/subscription?tran_id=...` makes the page call
+  `POST /subscription/verify/{tranId}` — activation trusts ONLY the
+  gateway checkTransaction result, never the query params.
+  Checkout idempotency (Step 26, decision 2026-10-08): a repeated
+  checkout for the same (owner, plan) REUSES the most recent PENDING
+  order created within `checkout_pending_reuse_minutes` (SUBSCRIPTION
+  catalog, default 10, 0 disables) instead of inserting a duplicate —
+  same `tran_id`/`req_time` are kept, the response (hash, form fields,
+  return URLs) is rebuilt from the current request and the order row's
+  `payway_hash` updated. PAID/FAILED orders and orders older than the
+  window are never reused.
 - POST `/subscription/verify/{tranId}`  authoritative checkTransaction
   (status.code 0/00 + payment_status APPROVED), activates/extend on success
 - POST `/payments/payway/callback`      provider callback (public), same
-  authoritative verification, idempotent per order status
+  authoritative verification, idempotent per order status.
+  Step 25 abuse control + forensics: per-IP sliding-window rate limit
+  (`rate_limit_payway_callback_per_minute`, SECURITY catalog, default
+  60/min,   429 + `RATE_LIMITED` event when exceeded) and every invocation is
+  journaled to the append-only `payment_events` table — exactly one
+  source `CALLBACK` row per request with its final outcome
+  (RATE_LIMITED / MISSING_TRAN_ID / ORDER_<status> / ERROR) plus
+  source `CHECK` rows
+  written by `verifyAndActivateViaGateway` carrying the raw
+  check-transaction response (APPROVED / NOT_APPROVED)
 - POST `/payments/payway/simulate-complete` sandbox/dev helper to complete an
   order without real bank (gated by `payway_sandbox_mode`)
 
@@ -372,6 +431,10 @@ Admin (`/api/v1/admin`, `@PreAuthorize("hasRole('ADMIN')")`):
 - GET  `/hosts`                         host accounts with subscription state
 - POST `/hosts/{id}/extend`             manual subscription extension
 - GET  `/orders`                        recent orders
+- GET  `/insights`                      revenue per plan (PAID orders grouped
+  by plan + per-currency totals) and registration cohort/churn counts
+  (owner_accounts grouped by created month: registered / active_now /
+  churned, churned = subscription_ends_at in the past) — Step 27
 - GET|PUT `/settings/payway`            typed PayWay settings (legacy shape;
   delegates to the settings module)
 
@@ -407,15 +470,65 @@ controlled from the admin UI. Package `com.tongtin.settings`, backed by the
 - Runtime effect (values are read at use time, no restart):
   - PAYMENT: PayWay merchant/api key/urls/sandbox/enabled
   - SUBSCRIPTION: `enforce_subscription`, `free_trial_days` (trial length at
-    owner registration), `grace_period_days`, `subscription_reminder_days`
+    owner registration), `grace_period_days`, `subscription_reminder_days`,
+    `checkout_pending_reuse_minutes` (Step 26 order-reuse window)
   - GROUPS: `default_bid_close_offset_days` (group create default)
   - SECURITY: `access_token_ttl_minutes`, `refresh_token_ttl_days` (per token
-    issuance), `rate_limit_register_per_hour`, `rate_limit_login_per_15min`
+    issuance), `rate_limit_register_per_hour`, `rate_limit_login_per_15min`,
+    `rate_limit_payway_callback_per_minute` (Step 25)
     (per request). `app.jwt.secret` intentionally stays in env/yml only —
     rotating a signing key is a deployment action, not an admin-UI action.
 - Admin UI: `/admin` settings tab is catalog-driven — one card per category,
   inputs rendered per type (toggle/number/password/text), SECRET shows a
   "configured" badge instead of the value, per-category save.
+
+Export (Step 30) — decision 2026-10-08 (user: CSV + real .xlsx via Apache POI):
+file downloads that REUSE the Step 15 JSON reports as the data source — same
+services, same permissions, same 404s; export adds no new queries, no new math.
+New package `com.tongtin.reports.export` (Table builder + CsvRenderer +
+XlsxRenderer + ExportService); `org.apache.poi:poi-ooxml` added to pom.xml.
+- HOST GET /groups/{id}/export/ledger?format=csv|xlsx
+- HOST GET /groups/{id}/export/profit?format=csv|xlsx
+- MEMBER GET /me/groups/{id}/export/statement?format=csv|xlsx
+  `format` defaults to `csv`; unknown value -> 400. Response is an attachment:
+  Content-Type `text/csv;charset=UTF-8` or
+  `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,
+  filename `tongtin-<kind>-g<groupId>.<ext>`.
+- Money is rendered as an exact major-unit decimal string via
+  BigDecimal.valueOf(amountMinor, exponent).toPlainString() — integer math
+  only (VND exponent 0 yields the plain integer); dates are ISO-8601 UTC text.
+  All report JSON money shapes stay as-is; decimal rendering is export-only.
+- Columns (header row, then data rows):
+  - ledger: groupName, currency, entryId, cycleNo, shareNo, type, direction,
+    memberProfileId, memberName, amount, status, dueAt, allocated, remaining;
+    trailing rows `type=TOTAL_IN` / `type=TOTAL_OUT` put the report's
+    totalIn/totalOut into `amount`.
+  - profit: groupName, currency, formulaVersion, cycleNo, status, openedAt,
+    closedAt, winnerShareNo, winnerName, winningBid, grossPot, hostFee,
+    netPayout, settledHostFee; trailing row `cycleNo=TOTAL` fills grossPot,
+    hostFee, netPayout, settledHostFee from report totals (per-cycle
+    settledHostFee cell stays empty).
+  - statement: groupName, currency, shareNo, shareStatus, entryId, cycleNo,
+    type, direction, amount, status, dueAt, allocated, remaining,
+    runningBalance; trailing rows `type=TOTAL_CONTRIBUTED | TOTAL_RECEIVED |
+    TOTAL_FEES_PAID | TOTAL_NET_POSITION` put the totals into `amount`.
+    Per-share totals stay JSON-only; exports carry group totals.
+- CSV rules: UTF-8 BOM as first byte (Excel auto-detect), CRLF row endings,
+  RFC 4180 quoting (embedded `"` doubled); a NON-NUMERIC cell starting with
+  `=`, `+`, `@` or `-` is prefixed with `'` (CSV formula-injection guard,
+  OWASP). Numeric cells — which include negative money like `-5000.00` — are
+  emitted raw so Excel parses them as numbers.
+- XLSX rules: one sheet named after the kind (ledger/profit/statement),
+  header row + data rows; a cell whose FULL content parses as a number is
+  written as a numeric cell (summable in Excel), everything else as a text
+  cell — text cells never evaluate as formulas, so no guard is needed there.
+- Statement export is member-scoped: own shares only, and it can never carry
+  hostFee/host profit because MemberReportService (the JSON source) already
+  excludes them.
+- Web: CSV/XLSX buttons on /host/groups/[id]/ledger (ledger), host group
+  cycles tab (profit), and the member statement tab; downloads use
+  fetch-with-token -> Blob -> anchor click (the API requires a Bearer token,
+  so plain links cannot work).
 
 ## 6. Frontend pages
 

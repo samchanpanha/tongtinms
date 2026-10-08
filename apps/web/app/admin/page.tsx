@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { api, AdminSetting, AdminSettingsView } from "@/lib/api";
+import { api, AdminSetting, AdminSettingsView, AdminInsights } from "@/lib/api";
 import { useLanguage } from "@/lib/i18n";
 import { formatMoney, formatDateTime } from "@/lib/format";
 import {
@@ -18,6 +18,7 @@ import {
   RefreshCw,
   Save,
   X,
+  TrendingUp,
 } from "lucide-react";
 
 function buildSettingsDraft(view: AdminSettingsView): Record<string, string> {
@@ -81,7 +82,7 @@ interface Order {
 
 export default function AdminPage() {
   const { language, t } = useLanguage();
-  const [activeTab, setActiveTab] = useState<"settings" | "plans" | "hosts" | "orders">("settings");
+  const [activeTab, setActiveTab] = useState<"settings" | "plans" | "hosts" | "orders" | "insights">("settings");
 
   const [settingsView, setSettingsView] = useState<AdminSettingsView | null>(null);
   const [settingsDraft, setSettingsDraft] = useState<Record<string, string>>({});
@@ -89,6 +90,7 @@ export default function AdminPage() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [hosts, setHosts] = useState<HostAdminView[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [insights, setInsights] = useState<AdminInsights | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -113,14 +115,16 @@ export default function AdminPage() {
       api.getAdminPlans(),
       api.getAdminHosts(),
       api.getAdminOrders(),
+      api.getAdminInsights(),
     ])
-      .then(([settingsRes, plansRes, hostsRes, ordersRes]) => {
+      .then(([settingsRes, plansRes, hostsRes, ordersRes, insightsRes]) => {
         if (!ignore) {
           setSettingsView(settingsRes);
           setSettingsDraft(buildSettingsDraft(settingsRes));
           setPlans(plansRes);
           setHosts(hostsRes);
           setOrders(ordersRes);
+          setInsights(insightsRes);
           setError(null);
           setLoading(false);
         }
@@ -373,6 +377,18 @@ export default function AdminPage() {
         >
           <Receipt className="h-4 w-4" />
           <span>{t.admin.tabOrders} ({orders.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab("insights")}
+          className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all cursor-pointer ${
+            activeTab === "insights"
+              ? "bg-indigo-600 text-white shadow-sm"
+              : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300"
+          }`}
+        >
+          <TrendingUp className="h-4 w-4" />
+          <span>{t.admin.tabInsights}</span>
         </button>
       </div>
 
@@ -635,6 +651,93 @@ export default function AdminPage() {
                     <td className="px-4 py-3 text-zinc-500">
                       {formatDateTime(o.paidAt ?? o.createdAt, language)}
                     </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 5: Insights — revenue per plan + registration cohorts (Step 27) */}
+      {activeTab === "insights" && insights && (
+        <div className="space-y-6">
+          <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-50 flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-indigo-600" />
+            {t.admin.insightsTitle}
+          </h2>
+
+          <div className="overflow-x-auto rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="border-b border-zinc-200 px-4 py-3 text-xs font-bold text-zinc-700 dark:border-zinc-800 dark:text-zinc-300">
+              {t.admin.insightsRevenueTitle}
+            </div>
+            <table className="w-full text-left text-xs">
+              <thead className="border-b border-zinc-200 bg-zinc-50 font-semibold text-zinc-700 dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-300">
+                <tr>
+                  <th className="px-4 py-3">{t.admin.colPlanName}</th>
+                  <th className="px-4 py-3">{t.admin.currencyLabel}</th>
+                  <th className="px-4 py-3 text-right">{t.admin.colPaidOrders}</th>
+                  <th className="px-4 py-3 text-right">{t.admin.colRevenue}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                {insights.revenueByPlan.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-6 text-center text-zinc-400">—</td>
+                  </tr>
+                )}
+                {insights.revenueByPlan.map((r) => (
+                  <tr key={`${r.planId}-${r.currency}`} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/50">
+                    <td className="px-4 py-3 font-semibold text-zinc-900 dark:text-zinc-100">{r.planName}</td>
+                    <td className="px-4 py-3 font-mono">{r.currency}</td>
+                    <td className="px-4 py-3 text-right font-semibold">{r.paidOrders}</td>
+                    <td className="px-4 py-3 text-right font-bold text-zinc-900 dark:text-zinc-100">
+                      {formatMoney(r.revenueMinor, r.currency)}
+                    </td>
+                  </tr>
+                ))}
+                {insights.totalsByCurrency.length > 0 && (
+                  <tr className="bg-zinc-50/70 dark:bg-zinc-800/70">
+                    <td className="px-4 py-3 font-bold" colSpan={2}>
+                      {insights.totalsByCurrency.map((t2) => t2.currency).join(" / ")}
+                    </td>
+                    <td className="px-4 py-3 text-right font-bold">
+                      {insights.totalsByCurrency.reduce((sum, t2) => sum + t2.paidOrders, 0)}
+                    </td>
+                    <td className="px-4 py-3 text-right font-bold text-zinc-900 dark:text-zinc-100">
+                      {insights.totalsByCurrency.map((t2) => formatMoney(t2.revenueMinor, t2.currency)).join(" + ")}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="overflow-x-auto rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="border-b border-zinc-200 px-4 py-3 text-xs font-bold text-zinc-700 dark:border-zinc-800 dark:text-zinc-300">
+              {t.admin.insightsCohortTitle}
+            </div>
+            <table className="w-full text-left text-xs">
+              <thead className="border-b border-zinc-200 bg-zinc-50 font-semibold text-zinc-700 dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-300">
+                <tr>
+                  <th className="px-4 py-3">{t.admin.colMonth}</th>
+                  <th className="px-4 py-3 text-right">{t.admin.colRegistered}</th>
+                  <th className="px-4 py-3 text-right">{t.admin.colActiveNow}</th>
+                  <th className="px-4 py-3 text-right">{t.admin.colChurned}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                {insights.cohorts.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-6 text-center text-zinc-400">—</td>
+                  </tr>
+                )}
+                {insights.cohorts.map((c) => (
+                  <tr key={c.month} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/50">
+                    <td className="px-4 py-3 font-mono font-semibold text-zinc-900 dark:text-zinc-100">{c.month}</td>
+                    <td className="px-4 py-3 text-right font-semibold">{c.registered}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-emerald-600 dark:text-emerald-400">{c.activeNow}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-rose-600 dark:text-rose-400">{c.churned}</td>
                   </tr>
                 ))}
               </tbody>

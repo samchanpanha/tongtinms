@@ -56,6 +56,27 @@ export interface AdminSettingsView {
   categories: AdminSettingCategory[];
 }
 
+export interface AdminInsights {
+  revenueByPlan: Array<{
+    planId: number | null;
+    planName: string;
+    currency: string;
+    paidOrders: number;
+    revenueMinor: number;
+  }>;
+  totalsByCurrency: Array<{
+    currency: string;
+    paidOrders: number;
+    revenueMinor: number;
+  }>;
+  cohorts: Array<{
+    month: string;
+    registered: number;
+    activeNow: number;
+    churned: number;
+  }>;
+}
+
 const TOKEN_KEY = "tongtin_access_token";
 const USER_KEY = "tongtin_auth_data";
 
@@ -121,6 +142,41 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   }
 
   return res.json();
+}
+
+export type ExportFormat = "csv" | "xlsx";
+
+async function download(endpoint: string, fallbackFilename: string): Promise<void> {
+  const token = getStoredToken();
+  const headers = new Headers();
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+  const res = await fetch(`/api/v1${endpoint}`, { headers });
+  if (!res.ok) {
+    let errorMsg = `Request failed (HTTP ${res.status})`;
+    try {
+      const errJson = await res.json();
+      errorMsg = errJson.message || errJson.error || errorMsg;
+    } catch {
+      // ignore
+    }
+    const error = new Error(errorMsg) as Error & { status: number };
+    error.status = res.status;
+    throw error;
+  }
+  const blob = await res.blob();
+  const disposition = res.headers.get("Content-Disposition") || "";
+  const nameMatch = /filename="([^"]+)"/.exec(disposition);
+  const filename = nameMatch ? nameMatch[1] : fallbackFilename;
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = objectUrl;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(objectUrl);
 }
 
 export const api = {
@@ -240,6 +296,8 @@ export const api = {
     bidStep: number | null;
     bidCloseOffset: number;
     tieBreak: string;
+    lateFeeType: string;
+    lateFeeValue: number;
     rulesFrozen: boolean;
   }> {
     return request(`/groups/${id}`);
@@ -353,6 +411,21 @@ export const api = {
     return request(`/groups/${groupId}/debts`);
   },
 
+  async assessLateFees(groupId: number | string): Promise<{
+    assessed: number;
+    created: number;
+    entries: Array<{
+      ledgerEntryId: number;
+      cycleId: number;
+      shareId: number;
+      amountMinor: number;
+      currency: string;
+      dueAt: string;
+    }>;
+  }> {
+    return request(`/groups/${groupId}/late-fees/assess`, { method: "POST" });
+  },
+
   // Reports
   async getGroupLedger(groupId: number | string): Promise<{
     groupId: number;
@@ -400,6 +473,27 @@ export const api = {
     };
   }> {
     return request(`/groups/${groupId}/profit`);
+  },
+
+  async exportLedger(groupId: number | string, format: ExportFormat): Promise<void> {
+    await download(
+      `/groups/${groupId}/export/ledger?format=${format}`,
+      `tongtin-ledger-g${groupId}.${format}`
+    );
+  },
+
+  async exportProfit(groupId: number | string, format: ExportFormat): Promise<void> {
+    await download(
+      `/groups/${groupId}/export/profit?format=${format}`,
+      `tongtin-profit-g${groupId}.${format}`
+    );
+  },
+
+  async exportStatement(groupId: number | string, format: ExportFormat): Promise<void> {
+    await download(
+      `/me/groups/${groupId}/export/statement?format=${format}`,
+      `tongtin-statement-g${groupId}.${format}`
+    );
   },
 
   // Member Portal
@@ -704,6 +798,10 @@ export const api = {
     createdAt: string;
   }>> {
     return request("/admin/orders");
+  },
+
+  async getAdminInsights(): Promise<AdminInsights> {
+    return request("/admin/insights");
   },
 
   async getAdminSettings(): Promise<AdminSettingsView> {

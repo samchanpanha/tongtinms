@@ -14,6 +14,7 @@ import com.tongtin.identity.repository.UserRepository;
 import com.tongtin.members.repository.MemberProfileRepository;
 import com.tongtin.notify.service.NotificationService;
 import com.tongtin.settings.service.SettingsService;
+import com.tongtin.subscription.dto.AdminInsightsDto;
 import com.tongtin.subscription.dto.ExtendSubscriptionRequest;
 import com.tongtin.subscription.dto.HostAdminViewDto;
 import com.tongtin.subscription.dto.PayWayCheckoutRequest;
@@ -43,6 +44,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class SubscriptionService {
 
     private static final Logger log = LoggerFactory.getLogger(SubscriptionService.class);
+    private static final int DEFAULT_CHECKOUT_REUSE_MINUTES = 10;
 
     private final SubscriptionPlanRepository planRepository;
     private final SubscriptionOrderRepository orderRepository;
@@ -54,6 +56,7 @@ public class SubscriptionService {
     private final AuditEventRepository auditEventRepository;
     private final NotificationService notificationService;
     private final PayWayService payWayService;
+    private final PaymentEventService paymentEventService;
 
     public SubscriptionService(
             SubscriptionPlanRepository planRepository,
@@ -65,7 +68,8 @@ public class SubscriptionService {
             MemberProfileRepository memberProfileRepository,
             AuditEventRepository auditEventRepository,
             NotificationService notificationService,
-            PayWayService payWayService) {
+            PayWayService payWayService,
+            PaymentEventService paymentEventService) {
         this.planRepository = planRepository;
         this.orderRepository = orderRepository;
         this.settingsService = settingsService;
@@ -76,6 +80,7 @@ public class SubscriptionService {
         this.auditEventRepository = auditEventRepository;
         this.notificationService = notificationService;
         this.payWayService = payWayService;
+        this.paymentEventService = paymentEventService;
     }
 
     // ==========================================
@@ -212,6 +217,12 @@ public class SubscriptionService {
     // ==========================================
     @Transactional
     public PayWayCheckoutResponse checkoutPayWay(Long userId, Long ownerId, PayWayCheckoutRequest req) {
+        return checkoutPayWay(userId, ownerId, req, null);
+    }
+
+    @Transactional
+    public PayWayCheckoutResponse checkoutPayWay(Long userId, Long ownerId, PayWayCheckoutRequest req,
+            String requestOrigin) {
         SubscriptionPlan plan = planRepository.findById(req.planId())
                 .orElseThrow(() -> new NotFoundException("Subscription plan not found"));
 
@@ -229,10 +240,33 @@ public class SubscriptionService {
         OwnerAccount owner = ownerAccountRepository.findById(ownerId)
                 .orElseThrow(() -> new NotFoundException("Owner not found"));
 
-        String reqTime = payWayService.generateReqTime();
-        // Unguessable suffix: tran_id itself must not be enumerable.
-        String tranId = "TT_" + ownerId + "_"
-                + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 10);
+        // Checkout idempotency (Step 26): reuse the most recent PENDING order for
+        // this (owner, plan) within the configured window instead of inserting a
+        // duplicate on a repeated click. Same tran_id/req_time are kept; everything
+        // else is rebuilt from the current request.
+        int reuseMinutes = settingsService.getInt("checkout_pending_reuse_minutes",
+                DEFAULT_CHECKOUT_REUSE_MINUTES);
+        SubscriptionOrder reusableOrder = null;
+        if (reuseMinutes > 0) {
+            reusableOrder = orderRepository
+                    .findFirstByOwnerIdAndPlanIdAndStatusAndCreatedAtAfterOrderByCreatedAtDesc(
+                            ownerId, plan.getId(), "PENDING",
+                            Instant.now().minus(Duration.ofMinutes(reuseMinutes)))
+                    .orElse(null);
+        }
+
+        String reqTime;
+        String tranId;
+        if (reusableOrder != null) {
+            reqTime = reusableOrder.getReqTime();
+            tranId = reusableOrder.getTranId();
+            log.debug("Reusing PENDING checkout order {} for owner {}", tranId, ownerId);
+        } else {
+            reqTime = payWayService.generateReqTime();
+            // Unguessable suffix: tran_id itself must not be enumerable.
+            tranId = "TT_" + ownerId + "_"
+                    + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 10);
+        }
 
         String merchantId = payWayService.getMerchantId();
         String amountStr = payWayService.formatAmount(plan.getPriceMinor(), plan.getCurrency());
@@ -251,9 +285,12 @@ public class SubscriptionService {
                 ? req.paymentOption()
                 : "cards,abapay_khqr,abapay_deeplink";
 
-        String returnUrl = req.returnUrl() != null ? req.returnUrl() : "/host/subscription?status=success&tran_id=" + tranId;
-        String continueSuccessUrl = req.continueSuccessUrl() != null ? req.continueSuccessUrl() : "/host/subscription?status=success";
-        String cancelUrl = req.cancelUrl() != null ? req.cancelUrl() : "/host/subscription?status=cancelled";
+        String returnBase = resolveReturnBase(req.returnUrl(), requestOrigin);
+        String continueBase = resolveReturnBase(req.continueSuccessUrl(), requestOrigin, returnBase);
+        String cancelBase = resolveReturnBase(req.cancelUrl(), requestOrigin, returnBase);
+        String returnUrl = withParams(returnBase, "status=success&tran_id=" + tranId);
+        String continueSuccessUrl = withParams(continueBase, "status=success&tran_id=" + tranId);
+        String cancelUrl = withParams(cancelBase, "status=cancelled&tran_id=" + tranId);
 
         String hash = payWayService.generatePurchaseHash(
                 reqTime,
@@ -274,18 +311,25 @@ public class SubscriptionService {
                 "" // returnParams
         );
 
-        // Save order in database
-        SubscriptionOrder order = new SubscriptionOrder();
-        order.setOwnerId(ownerId);
-        order.setPlanId(plan.getId());
-        order.setTranId(tranId);
-        order.setAmountMinor(plan.getPriceMinor());
-        order.setCurrency(plan.getCurrency());
-        order.setStatus("PENDING");
-        order.setPaymentGateway("ABA_PAYWAY");
-        order.setReqTime(reqTime);
-        order.setPaywayHash(hash);
-        orderRepository.save(order);
+        // Persist: reuse keeps the same PENDING row (hash refreshed for the current
+        // request's payment option / return URLs), otherwise insert a new order.
+        SubscriptionOrder order;
+        if (reusableOrder != null) {
+            reusableOrder.setPaywayHash(hash);
+            order = orderRepository.save(reusableOrder);
+        } else {
+            order = new SubscriptionOrder();
+            order.setOwnerId(ownerId);
+            order.setPlanId(plan.getId());
+            order.setTranId(tranId);
+            order.setAmountMinor(plan.getPriceMinor());
+            order.setCurrency(plan.getCurrency());
+            order.setStatus("PENDING");
+            order.setPaymentGateway("ABA_PAYWAY");
+            order.setReqTime(reqTime);
+            order.setPaywayHash(hash);
+            orderRepository.save(order);
+        }
 
         // Prepare ABA KHQR payload string simulation / standard KHQR format
         String qrString = String.format("00020101021229370016abaa%s%s520459995303840540%s5802KH59%02d%s6010PHNOM PENH62200716%s6304%s",
@@ -328,6 +372,89 @@ public class SubscriptionService {
                 qrString,
                 formFields
         );
+    }
+
+    private String resolveReturnBase(String provided, String origin) {
+        return resolveReturnBase(provided, origin, null);
+    }
+
+    /**
+     * Resolves a return-URL base to an absolute (or origin-rooted) URL the ABA
+     * gateway can redirect to. Client-supplied absolute URLs must match the
+     * request Origin (scheme http/https, same host+port); path-only URLs
+     * resolve against Origin. Without Origin, relative defaults are kept
+     * (tests/curl). Query strings carrying status/tran_id are rejected -
+     * the server owns those parameters.
+     */
+    private String resolveReturnBase(String provided, String origin, String fallback) {
+        String base;
+        if (provided != null && !provided.isBlank()) {
+            base = provided.trim();
+        } else if (fallback != null) {
+            return fallback;
+        } else {
+            String prefix = (origin != null && !origin.isBlank()) ? trimTrailingSlash(origin.trim()) : "";
+            return prefix + "/host/subscription";
+        }
+
+        if (base.startsWith("/") && base.indexOf('?') < 0) {
+            // path-only, no query - safe as-is, prefix with origin when known
+            return (origin != null && !origin.isBlank()) ? trimTrailingSlash(origin.trim()) + base : base;
+        }
+
+        java.net.URI uri;
+        try {
+            uri = java.net.URI.create(base);
+        } catch (IllegalArgumentException ex) {
+            throw new BadRequestException("Invalid return URL");
+        }
+
+        String query = uri.getRawQuery();
+        if (query != null && (query.contains("status=") || query.contains("tran_id="))) {
+            throw new BadRequestException("Return URL must not contain status or tran_id parameters");
+        }
+
+        String scheme = uri.getScheme();
+        if (scheme == null) {
+            throw new BadRequestException("Invalid return URL");
+        }
+        if (!scheme.equalsIgnoreCase("http") && !scheme.equalsIgnoreCase("https")) {
+            throw new BadRequestException("Invalid return URL scheme");
+        }
+        if (uri.getHost() == null || uri.getUserInfo() != null) {
+            throw new BadRequestException("Invalid return URL");
+        }
+
+        if (origin != null && !origin.isBlank()) {
+            java.net.URI originUri;
+            try {
+                originUri = java.net.URI.create(origin.trim());
+            } catch (IllegalArgumentException ex) {
+                originUri = null;
+            }
+            if (originUri != null && originUri.getHost() != null) {
+                if (!uri.getHost().equalsIgnoreCase(originUri.getHost())
+                        || effectivePort(uri) != effectivePort(originUri)) {
+                    throw new BadRequestException("Return URL origin does not match request origin");
+                }
+            }
+        }
+        return base;
+    }
+
+    private int effectivePort(java.net.URI uri) {
+        if (uri.getPort() != -1) {
+            return uri.getPort();
+        }
+        return "https".equalsIgnoreCase(uri.getScheme()) ? 443 : 80;
+    }
+
+    private String trimTrailingSlash(String s) {
+        return s.endsWith("/") ? s.substring(0, s.length() - 1) : s;
+    }
+
+    private String withParams(String base, String query) {
+        return base.contains("?") ? base + "&" + query : base + "?" + query;
     }
 
     // ==========================================
@@ -402,6 +529,9 @@ public class SubscriptionService {
 
         PayWayService.TransactionCheck check = payWayService.checkTransaction(
                 order.getReqTime(), payWayService.getMerchantId(), tranId);
+
+        paymentEventService.record(tranId, "CHECK",
+                check.approved() ? "APPROVED" : "NOT_APPROVED", check.rawJson(), null);
 
         if (!check.approved()) {
             log.warn("Order {} not approved by ABA PayWay check-transaction; leaving status {}",
@@ -517,6 +647,42 @@ public class SubscriptionService {
     @Transactional(readOnly = true)
     public List<SubscriptionOrder> getAdminOrdersList() {
         return orderRepository.findAllByOrderByCreatedAtDesc();
+    }
+
+    /**
+     * Admin insights (Step 27): revenue per plan from PAID orders (minor units,
+     * split by currency — plans exist in USD and KHR) plus registration-month
+     * cohorts with active/churned counts. churned = subscription lapsed.
+     */
+    @Transactional(readOnly = true)
+    public AdminInsightsDto getAdminInsights() {
+        List<AdminInsightsDto.PlanRevenue> revenueByPlan = new ArrayList<>();
+        Map<String, long[]> totalsByCurrency = new LinkedHashMap<>();
+        for (Object[] row : orderRepository.findPaidRevenueByPlan()) {
+            Long planId = row[0] == null ? null : ((Number) row[0]).longValue();
+            String planName = (String) row[1];
+            String currency = (String) row[2];
+            long paidOrders = ((Number) row[3]).longValue();
+            long revenueMinor = ((Number) row[4]).longValue();
+            revenueByPlan.add(new AdminInsightsDto.PlanRevenue(planId, planName, currency,
+                    paidOrders, revenueMinor));
+            long[] agg = totalsByCurrency.computeIfAbsent(currency, c -> new long[2]);
+            agg[0] += paidOrders;
+            agg[1] += revenueMinor;
+        }
+        List<AdminInsightsDto.CurrencyTotal> totals = new ArrayList<>();
+        totalsByCurrency.forEach((currency, agg) ->
+                totals.add(new AdminInsightsDto.CurrencyTotal(currency, agg[0], agg[1])));
+
+        List<AdminInsightsDto.Cohort> cohorts = new ArrayList<>();
+        for (Object[] row : ownerAccountRepository.findRegistrationCohortStats()) {
+            cohorts.add(new AdminInsightsDto.Cohort(
+                    (String) row[0],
+                    ((Number) row[1]).longValue(),
+                    ((Number) row[2]).longValue(),
+                    ((Number) row[3]).longValue()));
+        }
+        return new AdminInsightsDto(revenueByPlan, totals, cohorts);
     }
 
     @Transactional(readOnly = true)

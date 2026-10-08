@@ -29,12 +29,22 @@
 | 16 | Hardening | ✅ DONE (2026-10-07) — V10 payment Idempotency-Key replay 200 / mismatch 409, audit_events on all money/winner actions, rounding boundary tests, authz sweep matrix, demo seeder (app.seed-demo=true) reproducing N=10 fixture A, 119 tests pass |
 | 17 | Preview polish | ✅ DONE (2026-10-07) — Vietnamese UI copy first (1.000.000 đ), modern web UX & dark mode, host & member portal routes, preview allowedOrigins, all-in-one start.sh, npm run build (11/11 routes) & lint 0 errors, 119 tests pass |
 | 18 | Final delivery & wrap-up | ✅ DONE (2026-10-07) — End-to-end verification (10/10 checks pass), audit trail verified, comprehensive README, all-in-one start.sh --seed, 119 tests pass |
+| 19 | SaaS subscriptions & ABA PayWay | ✅ DONE (2026-10-07) — 1-month free trial, PayWay HMAC-SHA512 checkout/KHQR, admin plans/hosts/orders, V11; post-delivery security fixes + lifecycle job (see §7) |
 | 20 | Centralized settings module | ✅ DONE (2026-10-07) — catalog-driven `SettingsService` + `/api/v1/admin/settings` + admin UI (4 categories / 15 keys), 8 consumers rewired, `AdminSettingsTests` → 141 tests pass (see §8) |
 | 21 | Docker deployment (full stack) | ✅ DONE (2026-10-07) — multi-stage Dockerfiles (api + web), Docker Compose with postgres/api/web + healthcheck-gated startup, Next.js standalone build, `.env.example`; 3 containers healthy, health UP direct + via proxy, login e2e 200 (see §9) |
+| 22 | Release-gate audit | ✅ DONE (2026-10-08) — plan.md §3 all 10 cross-cutting gates ticked with test evidence, new `ReleaseGateTests` (4), `mvn test` → 145 tests pass (see §11) |
+| 24 | Real ABA PayWay return flow | ✅ DONE (2026-10-08) — absolute same-origin return URLs composed server-side (`?status&tran_id`), gateway-return handling on `/host/subscription` with authoritative re-verify, cross-origin/smuggled-param rejection, 5 new tests → 150 pass (see §12) |
+| 25 | payment_events forensics + callback rate limit | ✅ DONE (2026-10-08) — V12 append-only `payment_events` (CALLBACK/CHECK journals, raw payloads), per-IP sliding-window 429 on webhook via `rate_limit_payway_callback_per_minute` (SECURITY catalog), 6 new tests → 156 pass (see §13) |
+| 26 | Checkout idempotency (reuse PENDING order) | ✅ DONE (2026-10-08) — same (owner, plan) checkout within `checkout_pending_reuse_minutes` reuses PENDING order (same tran_id/req_time, hash rebuilt); PAID/expired never reused; 5 new tests → 161 pass (see §14) |
+| 27 | Subscription index + admin insights | ✅ DONE (2026-10-08) — V13 `idx_owner_sub_ends_status` for lifecycle scan; `GET /admin/insights` (revenue/PAID per plan + per-currency totals + cohort/churn) + new Insights admin tab; 4 new tests → 165 pass (see §15) |
+| 28 | Testcontainers hermetic test suite | ✅ DONE (2026-10-08) — singleton `postgres:16` per JVM via `spring.factories` initializer, `testcontainers.version` 1.21.4 override for Docker Engine 29; 165 pass WITH dev postgres stopped (see §16) |
+| 29 | Late fees (host-triggered assessment) | ✅ DONE (2026-10-08) — V14 late-fee partial index, `FormulaEngine.lateFee` (half-up), `LateFeeService` cumulative delta idempotency, `POST /groups/{id}/late-fees/assess`, Apply-Late-Fees button + i18n x4; 14 new tests → 179 pass (see §17) |
+| 30 | CSV/Excel export (ledger, profit, member statement) | ✅ DONE (2026-10-08) — poi-ooxml 5.5.1, CSV (UTF-8 BOM + RFC 4180 + formula-injection guard) and real .xlsx; `GET /export/{ledger,profit}` (HOST) + `/me/groups/{id}/export/statement` (MEMBER); `com.tongtin.reports.export` renders the Step 15 report DTOs (no new queries/math); buttons + i18n x12; 5 new tests → 184 pass (see §18) |
+| 31 | Wrap-up & cleanup | ✅ DONE (2026-10-08) — stale docs refreshed (README/00-INDEX/02-ARCH §3/03-BUILD-ROADMAP), Docker compose rebuilt + click-through (all 3 healthy, Flyway V1→V14 on existing volume, export sweep live), final `mvn test` 184 pass + `npm run build` 13/13 (see §19) |
 
-**Overall phase:** `completed` — planning 100%, code **18/18 steps done (100% COMPLETE)** + Step 19 subscriptions layer (see §7) + Step 20 centralized settings module (see §8) + Step 21 full-stack Docker deployment (see §9) + full 4-locale i18n pass (see §10).
+**Overall phase:** `completed` — planning 100%, code **18/18 MVP steps done** + Steps 19–21 SaaS/settings/Docker (§7–§9) + 4-locale i18n pass (§10) + Step 22 release-gate audit (§11) + Step 24 PayWay return flow (§12) + Step 25 payment forensics (§13) + Step 26 checkout idempotency (§14) + Step 27 index & insights (§15) + Step 28 hermetic tests (§16).
 **Blockers:** none.
-**Next action:** Full i18n pass delivered 2026-10-07 (§10); web Docker image rebuilt so the running stack serves it. Next candidates in §7.5.
+**Next action:** Approved track (A+B, core-only) continues with **Step 29 — late fees (V14)** (plan §6); Step 23 collapsed (audit found no behavior gaps).
 
 ### Easy follow steps (how to run every session)
 
@@ -262,20 +272,43 @@ Legend: `[x]` done · `[~]` current/partial · `[ ]` pending · **A** = acceptan
 
 ### Cross-cutting release gates (from manus_ai §11 + §14 + §16)
 
-- [ ] Member cannot read another member's sealed bid before close; closed bid uneditable via normal API.
-- [ ] Tie resolved by stored `tieBreak`, not server ordering.
+> Step 22 audit (2026-10-08): all gates now test-backed. `ReleaseGateTests` (4 new) formalizes the
+> previously unchecked gates; the rest were already covered by existing suites (evidence below).
+> `mvn test`: **145 tests, 0 failures**.
+
+- [x] Member cannot read another member's sealed bid before close; closed bid uneditable via normal API.
+      Evidence: `SealedBiddingTests.summaryHidesAmountsBeforeCloseAndRevealsAfter` (amountMinor/submittedAt
+      absent while sealed), `AuthzSweepTests` member → GET /cycles/{id}/summary 403 + `memberInOwnGroupCannotBidAnotherMembersShare`
+      403, `ReleaseGateTests.closedBidCannotBeEdited` (update after close → 400, stored row unchanged).
+- [x] Tie resolved by stored `tieBreak`, not server ordering.
+      Evidence: `CloseCalculateTests.tieBreakEarliestBidWins`, `tieBreakLowestMemberCodeUsesLowestShareNo`,
+      `hostDecisionTieRequiresWinnerShareId` (HOST_DECISION without body → 400).
 - [x] Retrying a contribution/payout event does not duplicate money (idempotency keys).
 - [x] Failed notification never changes financial state.
 - [x] Corrections create reversal trails; history never erased (audit trail on all money/winner actions).
-- [ ] Every payout shows gross pot, deductions, fee, rounding, winner, formula version.
-- [ ] Member statement reproducible from ledger events.
-- [ ] Rules frozen after first cycle; changes require new version + acknowledgement (post-MVP enforcement point).
-- [ ] All amounts integer minor units; float currency math prohibited (grep-level check).
-- [ ] Currency locked at first active cycle; a VND group rejects USD transactions.
+- [x] Every payout shows gross pot, deductions, fee, rounding, winner, formula version.
+      Evidence: `ReleaseGateTests.payoutReportShowsFullBreakdown` — cycle result (grossPot/hostFee/netPayout/
+      winner/winningBid scalars) + `GET /groups/{id}/profit` (money shape, formulaVersion ≥ 1, winner
+      identity, deduction identity gross − fee == net, settledHostFee); rounding HALF_UP covered by
+      `RoundingTests`; all amounts integer minor units (no rounding exposed separately in engine v1).
+- [x] Member statement reproducible from ledger events.
+      Evidence: `ReleaseGateTests.memberStatementIsReproducibleFromLedgerEvents` — totals and the whole
+      runningBalance chain independently recomputed from `ledger_entries` + `payment_allocations` match
+      the API response for winner and payer (01-DOMAIN §9.5 definitions).
+- [x] Rules frozen after first cycle; changes require new version + acknowledgement (post-MVP enforcement point).
+      Evidence: `GroupDraftTests.draftCanBeEditedButFrozenGroupCannot` — PATCH after RUNNING/rules_frozen
+      → 400; shares locked once frozen (`ShareService` "Rules are frozen"). New-version + member
+      acknowledgement remains the documented post-MVP enforcement point.
+- [x] All amounts integer minor units; float currency math prohibited (grep-level check).
+      Evidence: `ReleaseGateTests.mainSourceContainsNoFloatOrDoubleMoneyTypes` — walks `src/main/java`,
+      fails on any `double`/`float` keyword (currently zero matches).
+- [x] Currency locked at first active cycle; a VND group rejects USD transactions.
+      Evidence: `PaymentTests.currencyMismatchIs409` (USD payment on VND group → 409),
+      `GroupDraftTests.currencyForeignKeyIsEnforcedAtDatabaseLevel` (XXX → FK violation).
 
 ### Parked — NOT in MVP (do not schedule unless user asks)
 
-- P1 VietQR · P2 Excel/PDF sổ sách · P3 Zalo/Telegram/SMS · P4 guarantor/deposit · P5 member reputation · P6 calendar heatmap · P7 host what-if simulator · P8 commit-reveal bids · P9 PWA · P10 dark mode/keypad · P11 dispute PDF snapshot · P13 owner default formula · P14 group design templates (mẫu hụi) · P15 owner-local blacklist · P16 CycleSession attendance + dispute lock · P17 print templates · P18 extra currencies · P19 FX dashboard.
+- P1 VietQR · P2 PDF sổ sách (Excel/CSV export now released — Step 30, §18) · P3 Zalo/Telegram/SMS · P4 guarantor/deposit · P5 member reputation · P6 calendar heatmap · P7 host what-if simulator · P8 commit-reveal bids · P9 PWA · P10 dark mode/keypad · P11 dispute PDF snapshot · P13 owner default formula · P14 group design templates (mẫu hụi) · P15 owner-local blacklist · P16 CycleSession attendance + dispute lock · P17 print templates · P18 extra currencies · P19 FX dashboard.
 - Earliest sensible code (if ever promoted): P15 after Step 04, P13/P14 after Step 05, P16 after Step 10, P17 after Step 15.
 - Explicitly out of scope: RANDOM group type, FIRST_CYCLE_TO_HOST fee, microservices, free-form formula editor, global blacklist, AI choosing winners.
 
@@ -359,16 +392,19 @@ Legend: `[x]` done · `[~]` current/partial · `[ ]` pending · **A** = acceptan
 
 ## 6. Immediate Next Action
 
-All roadmap steps (00–18), the Step 19 subscriptions layer and the Step 20 centralized
-settings module are delivered and verified. The post-delivery audit (2026-10-07) is
-complete — see **§7** for fixes, the lifecycle job, and **§8** for the settings module.
+**Approved plan (2026-10-08): track A+B (gates & hardening first), core-only scope, one step per
+session.** Step 22 (gate audit) is done — §3 gates all ticked (§11). Step 23 collapsed: the audit
+found no behavior gaps requiring payout/freeze code changes. Step 24 (PayWay return flow) is
+done (§12); Step 25 (payment forensics) is done (§13); Step 26 (checkout idempotency) is done (§14);
+Step 27 (index + insights) is done (§15); Step 28 (hermetic tests) is done (§16). Step 29 (late fees) is done (§17). Step 30 (exports) is done (§18). **Step 31 (wrap-up) is done (§19) — the approved track A+B is COMPLETE.**
 
 ```
-Next candidates (user picks, then doc-gate per session rules):
-1. Frontend: wire real ABA PayWay return -> POST /subscription/verify/{tranId}
-2. payment_events forensics table + callback rate limit
-3. Checkout idempotency (reuse PENDING order per owner+plan)
-4. owner_accounts(subscription_ends_at, subscription_status) index
+Remaining steps:
+31. Wrap-up: stale docs/checkboxes, Docker click-through, full verification   — DONE (§19)
+
+Approved track A+B complete. Open items are user-gated only:
+- reminders (§7.5 ranks 6-7) need an explicit user decision before scheduling;
+- any parked P-item (P1-P19) needs an explicit user request.
 ```
 
 ---
@@ -416,16 +452,21 @@ Next candidates (user picks, then doc-gate per session rules):
 - Frontend untouched by these changes; sandbox demo flow (`payway_sandbox_mode = true` default) unaffected.
 - Live behavior confirmed in test logs: gateway check rejects unknown `tran_id`, order stays PENDING, owner stays TRIAL.
 
-### 7.5 Roadmap — analyzed, NOT yet implemented (ranked)
+### 7.5 Roadmap — ranks 1–5 & 8 delivered (Steps 24–28); 6–7 parked (user OK required)
 
-1. **Real gateway return flow (frontend)** — `/host/subscription` currently completes only via sandbox simulate. Wire the ABA PayWay redirect return (or `return_params`) to `POST /subscription/verify/{tranId}` (endpoint now exists, owner-scoped and gateway-verified) so production checkout completes end-to-end.
-2. **Payment forensics + abuse control** — append-only `payment_events` table storing raw callback/check-transaction payloads; rate-limit the public callback endpoint.
-3. **Checkout idempotency** — reuse/confirm a PENDING order per (owner, plan) within a time window to prevent double-click duplicate orders.
-4. **Index** `owner_accounts(subscription_ends_at, subscription_status)` when host count grows (lifecycle-job scan).
-5. **Admin insights** — revenue per plan, churn/cohort view on the admin hosts list.
+1. **Real gateway return flow (frontend)** ✅ Step 24 — `/host/subscription` now completes via
+   the ABA PayWay redirect return → `POST /subscription/verify/{tranId}` (gateway-verified).
+2. **Payment forensics + abuse control** ✅ Step 25 — append-only `payment_events` journaling
+   callback/check exchanges; per-IP rate limit on the public callback.
+3. **Checkout idempotency** ✅ Step 26 — PENDING order per (owner, plan) reused within
+   `checkout_pending_reuse_minutes`.
+4. **Index** `owner_accounts(subscription_ends_at, subscription_status)` ✅ Step 27 (V13).
+5. **Admin insights** ✅ Step 27 — `GET /admin/insights` revenue per plan + per-currency
+   totals + registration cohort/churn; Insights tab on `/admin`.
 6. **Renewal channels** — lifecycle job already emits the trigger point; Zalo/SMS/email notifier port plugs in whenever parked P3 is promoted.
 7. **Cycle-due reminders** — scheduler infra now exists (`@EnableScheduling`); requires explicit user confirmation (Step 14 decision).
-8. **Testcontainers migration** — tests currently hit the dev DB; move to isolated containers for hermetic CI.
+8. **Testcontainers migration** ✅ Step 28 — suite runs on an isolated `postgres:16`
+   container per JVM (hermetic; proven with the dev DB stopped).
 
 ---
 
@@ -549,3 +590,400 @@ Next candidates (user picks, then doc-gate per session rules):
   UP, zh chunk present in the baked image.
 
 
+
+---
+
+## 11. Release-gate audit (Step 22, 2026-10-08)
+
+**Scope:** audit + formalize the 10 cross-cutting release gates in §3 (manus_ai §11/§14/§16).
+No domain/API change (doc gate not triggered — tests only). Approved track A+B, core-only,
+one-step-per-session protocol.
+
+### 11.1 What the audit found
+
+| Gate | Status before | Evidence |
+|---|---|---|
+| Sealed bid confidentiality; closed bid uneditable | mostly covered | `SealedBiddingTests` (sealed hides amounts, reveal after close, window-closed 400) + `AuthzSweepTests` (member → summary 403, cross-member bid 403); **gap: explicit closed-bid immutability test → added** |
+| Tie by stored `tieBreak` | covered | 3 `CloseCalculateTests` (EARLIEST_BID, LOWEST_MEMBER_CODE, HOST_DECISION 400-without-body) |
+| Idempotent money retries | covered | Step 16 `PaymentIdempotencyTests` |
+| Notification failure ≠ financial state | covered | Step 14 `NotificationTests` |
+| Reversal/audit trails | covered | Step 16 `AuditTrailTests` |
+| Payout shows gross/deductions/fee/rounding/winner/formulaVersion | mostly covered | `ReportTests` profit asserts; **gap: single formal test of full breakdown → added** |
+| Statement reproducible from ledger | asserted, not recomputed | **gap: independent DB recomputation → added** |
+| Rules frozen after first cycle | covered | `GroupDraftTests.draftCanBeEditedButFrozenGroupCannot` (PATCH → 400) + `ShareService` freeze guard; version+ack stays post-MVP |
+| Integer minor units / no float (grep-level) | no automated check | **gap: source-scan test → added** |
+| Currency lock (VND group rejects USD) | covered | `PaymentTests.currencyMismatchIs409` + DB FK test |
+
+### 11.2 Deliverables
+
+- New `apps/api/src/test/java/com/tongtin/ReleaseGateTests.java` — 4 tests:
+  `closedBidCannotBeEdited`, `payoutReportShowsFullBreakdown`,
+  `memberStatementIsReproducibleFromLedgerEvents`, `mainSourceContainsNoFloatOrDoubleMoneyTypes`.
+- `plan.md` §3: all 10 gates ticked with per-gate evidence notes.
+- Environment note: dev PostgreSQL container had to be started first
+  (`docker compose up -d --wait postgres`); suite runs against the dev DB (Testcontainers = Step 28).
+
+### 11.3 Verification
+
+- `mvn test` → **145 tests, 0 failures** (baseline 141 + 4 new).
+- Fixes during the step: test used money shape on `CycleResponse` (raw scalars there — money shape
+  only in report DTOs); cleanup SQL paren typo; leftover test users from the failed run purged
+  (demo `+84900*` and admin `+84988999999` preserved).
+- Nothing committed (standing rule).
+
+---
+
+## 12. Real ABA PayWay return flow (Step 24, 2026-10-08)
+
+**Scope:** §7.5 rank 1 — wire the gateway redirect return so production checkout completes
+end-to-end (was sandbox-simulate only). Doc gate: `02-ARCHITECTURE.md` §5 Step 19 return-flow
+contract written before code.
+
+### 12.1 Gateway facts (from developer.payway.com.kh Purchase API)
+
+- `return_url` / `cancel_url` / `continue_success_url` / `return_params` are request fields
+  (return_url "encrypted with Base64" in the API description); what the gateway APPENDS to the
+  redirect query on return is not documented — error code 81 ("return URL not in the whitelist")
+  confirms absolute URLs are required.
+- Therefore the flow **trusts no query parameters**: landing with `?tran_id=...` only triggers
+  `POST /subscription/verify/{tranId}`; activation still requires the gateway check-transaction
+  APPROVED (Step 19 security posture unchanged).
+
+### 12.2 Contract
+
+- Web client passes `returnUrl = ${window.location.origin}/host/subscription` in the checkout
+  body; `SubscriptionController` reads the `Origin` request header and passes it to the service.
+- `SubscriptionService.resolveReturnBase(provided, origin[, fallback])`:
+  - absolute URL → must be http/https, no userinfo, host + effective port equal to Origin
+    (else 400 `Return URL origin does not match request origin`); relative path-only resolves
+    against Origin; query containing `status=` or `tran_id=` rejected (server owns those params).
+  - no Origin (tests/curl) and no URL → relative `/host/subscription` default (legacy behavior).
+- Composed (after resolution): `return_url` = base + `?status=success&tran_id=<tranId>`;
+  `continue_success_url` = base + `?status=success&tran_id=<tranId>`;
+  `cancel_url` = base + `?status=cancelled&tran_id=<tranId>`; HMAC re-signed over the final values.
+- 3-arg `checkoutPayWay` overload kept (existing tests unchanged).
+
+### 12.3 Frontend (`/host/subscription`)
+
+- On mount (StrictMode-safe `useRef` guard, deferred one tick for
+  `react-hooks/set-state-in-effect`): parse `?status&tran_id`, strip them via
+  `history.replaceState`, then — `status=cancelled` → amber cancel notice (no API call);
+  otherwise → blue "verifying" notice → `api.verifySubscriptionOrder(tranId)` →
+  emerald success banner + reload status/invoices, or rose failure banner.
+
+### 12.4 Verification
+
+- 5 new tests in `SubscriptionAndPayWayTests` (18 in class): absolute return URLs carry
+  `tran_id` in all three URLs + form field; Origin-derived default; cross-origin URL → 400;
+  smuggled `status=`/`tran_id=` params → 400; MockMvc checkout with `Origin` header composes
+  absolute `returnUrl`.
+- `mvn test` → **150 tests, 0 failures** (145 + 5). Web `eslint` + `tsc --noEmit` clean.
+- i18n `paymentCancelled` added to `types.ts` + en/km/vi/zh. Nothing committed (standing rule).
+
+---
+
+## 13. payment_events forensics + callback rate limit (Step 25, 2026-10-08)
+
+**Scope:** §7.5 rank 2 — append-only `payment_events` table storing raw callback /
+check-transaction payloads, plus a per-IP rate limit on the public webhook callback.
+Doc gate: `02-ARCHITECTURE.md` §4 + §5 callback bullet written before code.
+
+### 13.1 Journaling model
+
+- **V12 `payment_events`** (append-only): `id, tran_id (nullable), source (CALLBACK | CHECK),
+  outcome, payload TEXT (raw JSON, truncated 8000 chars), remote_ip, created_at`;
+  index `(tran_id, created_at DESC)`.
+- **Append-only by structure**: `PaymentEventRepository` extends the marker `Repository` and
+  declares only `save` + finders, so Spring Data generates no update/delete method; a test
+  guards the structure. Single write path `PaymentEventService.record(...)`, which swallows
+  and logs failures — forensics can never break the payment flow (notification invariant).
+- **One CALLBACK row per webhook invocation** with its final outcome:
+  `RATE_LIMITED` (429), `MISSING_TRAN_ID` (400), `ORDER_<status>` (200, request envelope in
+  payload), `ERROR` (400, envelope + error message). IP taken X-Forwarded-For-first.
+- **One CHECK row per gateway exchange**: `verifyAndActivateViaGateway` journals
+  `APPROVED` / `NOT_APPROVED` with the raw check-transaction response before deciding —
+  covers both the webhook and the host return-page verify.
+
+### 13.2 Rate limit
+
+- `CallbackRateLimiter` — in-memory sliding window per client IP (same mechanics as
+  `AuthRateLimitFilter`), window 1 minute, default 60/min from
+  `app.rate-limit.callback-per-minute`, live-overridable through the new SECURITY catalog key
+  `rate_limit_payway_callback_per_minute` (numeric, 1–1000). Exceeded → 429 JSON +
+  `RATE_LIMITED` journal row. Admin settings UI picks the key up from the catalog;
+  i18n label/description added in all 4 locales.
+
+### 13.3 Verification
+
+- New `PaymentForensicsTests` (6): real callback journals CALLBACK + CHECK (payload contains
+  tran_id, remote IP set, created_at populated after flush/clear); missing tran_id journaled;
+  direct gateway verify journals CHECK `NOT_APPROVED` (raw payload non-blank); limit=3 →
+  3×400 then 429 with exactly 3 `ERROR` + 1 `RATE_LIMITED` rows (isolated per test via
+  distinct `X-Forwarded-For` IPs); payload truncated to exactly 8000 chars; repository
+  structure guard (no delete/update methods).
+- `mvn test` → **156 tests, 0 failures** (150 + 6). Web `eslint` + `tsc --noEmit` clean.
+- V12 applied to dev DB (flyway rank 12); `payment_events` left with 0 rows (tests are
+  `@Transactional` and every `record()` joins the ambient test transaction) and the settings
+  key has no stored row (catalog default until first admin save). Nothing committed.
+
+---
+
+## 14. Checkout idempotency — reuse PENDING order (Step 26, 2026-10-08)
+
+**Scope:** §7.5 rank 3 — a repeated checkout for the same (owner, plan) must not insert a
+duplicate order row. Doc gate: `02-ARCHITECTURE.md` §5 checkout bullet + SUBSCRIPTION settings
+list updated before code (Step 25 SECURITY key backfilled in the same pass).
+
+### 14.1 Design
+
+- New SUBSCRIPTION catalog key `checkout_pending_reuse_minutes` (default 10, range 0–60,
+  0 disables reuse); i18n label/description in all 4 locales.
+- `checkoutPayWay` looks up the most recent **PENDING** order for (owner, plan) created within
+  the window (`findFirstByOwnerIdAndPlanIdAndStatusAndCreatedAtAfterOrderByCreatedAtDesc`).
+  - **Reuse**: keep stored `tran_id` + `req_time` (what PayWay checks against), rebuild hash /
+    form fields / return URLs from the current request, refresh `payway_hash` on the same row —
+    no insert.
+  - **No reuse**: PAID/FAILED orders, orders older than the window, a different plan, or
+    window = 0 → normal insert path (unchanged).
+- No frontend change: the submit button already disables in flight; the backend reuse is the
+  real guarantee against double-submit / retried POSTs.
+
+### 14.2 Verification
+
+- New `CheckoutIdempotencyTests` (5, `@Transactional`, fresh owner per test): same plan ×2 →
+  same `tran_id`/`req_time`, exactly 1 row; different plan → 2 orders with distinct ids;
+  PAID order (via `verifyAndActivateOrder`) not reused; expired window (native UPDATE backdates
+  `created_at` by 1h, PC-flushed) → new order; `checkout_pending_reuse_minutes = 0` → reuse off.
+- **Release-gate interplay**: the zero-float grep gate (`\b(double|float)\b` over
+  `src/main/java`) flagged the words "double-click" in the new setting description and code
+  comment — reworded to "repeated click" / "bấm lặp lại"; gate green again. Lesson: avoid
+  `double`/`float` tokens anywhere in main source, including human-readable strings.
+- `mvn test` → **161 tests, 0 failures** (156 + 5). Web `eslint` + `tsc --noEmit` clean.
+  Nothing committed (standing rule).
+
+---
+
+## 15. Subscription index + admin insights (Step 27, 2026-10-08)
+
+**Scope:** §7.5 ranks 4–5 — index `owner_accounts(subscription_ends_at, subscription_status)`
+for the lifecycle-job scan, and admin insights (revenue per plan + churn/cohort view).
+Doc gate: `02-ARCHITECTURE.md` §4 index line + §5 `GET /admin/insights` contract before code.
+
+### 15.1 Index
+
+- **V13 `idx_owner_sub_ends_status`** on `owner_accounts(subscription_ends_at, subscription_status)`
+  — serves the daily `SubscriptionLifecycleJob` scan
+  (`findBySubscriptionEndsAtBeforeAndSubscriptionStatusNotIn`). Applied to dev DB
+  (flyway rank 13 verified). Note: the late-fees migration moves to **V14** (V13 taken).
+
+### 15.2 Insights API + UI
+
+- `GET /api/v1/admin/insights` (ADMIN, `AdminSubscriptionController` →
+  `SubscriptionService.getAdminInsights()`), returns `AdminInsightsDto`:
+  - `revenueByPlan` — native SQL over **PAID** `subscription_orders` joined to plans,
+    grouped by (plan_id, name, currency): `PlanRevenue(planId, planName, currency,
+    paidOrders, revenueMinor)`.
+  - `totalsByCurrency` — rollup, one row per currency (USD and KHR plans coexist; no
+    cross-currency summing).
+  - `cohorts` — `owner_accounts` grouped by registration month (`YYYY-MM` desc):
+    `Cohort(month, registered, activeNow, churned)` where activeNow = endsAt >= now OR
+    LIFETIME, churned = endsAt past AND not LIFETIME (the two partition registered).
+- Admin UI `/admin`: new **Insights** tab (`TrendingUp` icon) rendered from the same
+  `Promise.all` fetch — revenue-by-plan table with a totals row (`formatMoney`, per-currency
+  strings joined when mixed) and a cohort table with active/churned color coding.
+- i18n: 11 new `admin.*` keys in `types.ts` + en/km/vi/zh.
+
+### 15.3 Verification
+
+- New `AdminInsightsTests` (4): anon 401 / host 403 / admin 200 (array payloads);
+  PAID-only revenue (second same-plan checkout stays PENDING and is excluded — reuses the
+  Step 26 behavior to prove PENDING orders never count), amount equals plan price;
+  KHR plan paid → own `KHR` currency total; current-month cohort contains the fresh trial
+  host as active and `registered >= activeNow + churned`.
+- `mvn test` → **165 tests, 0 failures** (161 + 4). Web `eslint` + `tsc --noEmit` clean.
+  Dev DB verified: flyway rank 13 applied, index present. Nothing committed (standing rule).
+
+---
+
+## 16. Testcontainers hermetic test suite (Step 28, 2026-10-08)
+
+**Scope:** §7.5 rank 8 — tests currently hit the dev DB; move to isolated containers for
+hermetic CI. Doc gate: README testing section rewritten before code.
+
+### 16.1 Design
+
+- **Wiring without touching 16 test classes**: `src/test/resources/META-INF/spring.factories`
+  registers `TestDatabaseInitializer` (an `ApplicationContextInitializer`), which lazily
+  starts ONE singleton `postgres:16` container per JVM (same image as dev compose) under a
+  lock, injects `spring.datasource.*` via `TestPropertyValues`, and stops it in a JVM
+  shutdown hook. Existing `@SpringBootTest` annotations are unchanged; Flyway migrates all
+  13 migrations from scratch on the empty container each `mvn test`.
+- **Version pin**: `<testcontainers.version>1.21.4</testcontainers.version>` overrides Boot
+  3.5.5's BOM default 1.21.3 — 1.21.3 negotiates Docker API 1.32, which **Docker Engine 29**
+  (Docker Desktop ≥ 4.52) rejects with `400 on /info`, so Testcontainers reports "no valid
+  Docker environment" (upstream: testcontainers-java #11422, fixed in 1.21.4).
+
+### 16.2 Verification
+
+- Full suite green against the container: **165 tests, 0 failures**.
+- **Hermetic proof**: `docker compose stop postgres` → rerun `mvn test` → still **165/165
+  pass** with the dev DB completely down (then restarted for dev use). The dev DB's Flyway
+  history is no longer touched by tests.
+- Requirement going forward: tests need a running Docker daemon, NOT a dev database.
+  README updated accordingly. Nothing committed (standing rule).
+
+---
+
+## 17. Late fees — host-triggered assessment (Step 29, 2026-10-08)
+
+**Scope:** 01-DOMAIN §9.6 late fee finally wired up. Doc gate: `01-DOMAIN.md` §9.6 Step 29
+semantics block + `02-ARCHITECTURE.md` §4 index line and §5 endpoint contract written BEFORE
+code (plan's old wording "V14 late_fee_type/value" was stale — those columns shipped in V3;
+V14 is the lookup index).
+
+### 17.1 Design (locked this session)
+
+- **Trigger:** explicit `POST /api/v1/groups/{id}/late-fees/assess` (HOST, owner-scoped →
+  404 cross-owner). GET `/debts` stays read-only. `lateFeeType = NONE` → `{0,0,[]}`.
+  No scheduler (matches Step 14 sync-only decision).
+- **Scope:** CONTRIBUTION obligations only (UNPAID/PARTIAL, `due_at < now`). Payout and
+  host-fee rows are never fee'd; LATE_FEE rows are never re-fee'd.
+- **Idempotency — cumulative delta model:** `target = lateFee(...)`; `charged = SUM(existing
+  LATE_FEE rows for (cycle_id, share_id))`; insert only the positive delta. Same-day re-run
+  writes nothing; PERCENT_PER_DAY grows with overdueDays (delta only). Source entries locked
+  pessimistically in ascending id (same order as PaymentService → no deadlock).
+- **Row shape:** `type=LATE_FEE`, `direction=IN` (money owed by the member — keeps
+  `feesPaid`/running-balance math in MemberReportService correct), `status=UNPAID`,
+  `dueAt` copied from the source obligation (surfaces in debts immediately),
+  shareId/memberProfileId/cycleId/currency copied from source.
+- **Formula** (`FormulaEngine.lateFee`, pure, zero-float): principal = contribution
+  `amount_minor`; `overdueDays` = whole days since `due_at`; half-up integer
+  `(principal * value * days + 50) / 100`; FIXED charges `lateFeeValue` once regardless of
+  days; `Math.multiplyExact`/`addExact` against overflow; unknown/negative → FormulaException.
+- **Response:** `{assessed, created, entries[]}` — entry = {ledgerEntryId, cycleId, shareId,
+  amountMinor, currency, dueAt}. Audit `LATE_FEES_ASSESSED` + `LATE_FEE_ASSESSED`
+  notification to affected members (same tx).
+
+### 17.2 What shipped
+
+| Piece | Where |
+|---|---|
+| V14 partial index `(cycle_id, share_id) WHERE type='LATE_FEE'` | `V14__late_fee_index.sql` |
+| `FormulaEngine.lateFee(...)` | `ledger/engine/FormulaEngine.java` |
+| `sumLateFeeByCycleAndShare` + `findStatusById` | `LedgerEntryRepository` |
+| `LateFeeAssessResponse` record | `com.tongtin.ledger.dto` (new package) |
+| `LateFeeService.assess(...)` | `com.tongtin.ledger.service` |
+| `POST /groups/{id}/late-fees/assess` | `PaymentController` |
+| Web button + banner, `api.assessLateFees`, getGroup TS fields | `apps/web` |
+| i18n keys `assessLateFeesBtn` / `msgLateFee*` x4 locales | `lib/i18n` |
+
+### 17.3 Verification
+
+- New `LateFeeTests` (8) + `FormulaEngineTests` +6 + `AuthzSweepTests.HOST_ONLY` row:
+  **mvn test → 179 tests, 0 failures** (165 + 14); zero-float grep gate green;
+  web `eslint` + `tsc --noEmit` clean. Nothing committed (standing rule).
+
+---
+
+## 18. CSV/Excel export — ledger, profit, member statement (Step 30, 2026-10-08)
+
+Fulfils the blueprint's "Exportable CSV/PDF reports" and the parked P2 (Excel/PDF
+sổ sách) — CSV and Excel are out; PDF print templates (mẫu in ấn) stay parked.
+
+### 18.1 Decision (user): CSV + real .xlsx via Apache POI
+`org.apache.poi:poi-ooxml:5.5.1` added to apps/api/pom.xml (Spring Boot does not
+manage POI). CSV is hand-rolled RFC 4180 + UTF-8 BOM (Excel auto-detect); XLSX is
+a real workbook. Doc gate landed first: `02-ARCHITECTURE.md` §2 stack row + §5
+full contract; `01-DOMAIN.md` §14 export-parity rules.
+
+### 18.2 Design locked
+- **Data source reuse:** exports call the Step 15 report services (ReportService /
+  MemberReportService) and render the JSON DTOs — same permission checks, same
+  404s, zero new queries, zero new money math. Statement export can NEVER carry
+  host fee/profit because the member service already excludes them.
+- **Endpoints** (`format` defaults to `csv`, unknown → 400):
+  `GET /groups/{id}/export/ledger`, `GET /groups/{id}/export/profit` (HOST),
+  `GET /me/groups/{id}/export/statement` (MEMBER). Attachment download,
+  filename `tongtin-<kind>-g<groupId>.<ext>`.
+- **Money rendering (export-only):** exact major-unit decimal string via
+  `BigDecimal.valueOf(amountMinor, exponent).toPlainString()` — integer math
+  only; VND (exponent 0) prints the plain integer. JSON stays the long minor
+  units. Dates = ISO-8601 UTC text.
+- **Columns** have a header row then data rows; totals ride along as
+  `type`-labelled trailing rows (TOTAL_IN/TOTAL_OUT, cycleNo=TOTAL,
+  TOTAL_CONTRIBUTED/TOTAL_RECEIVED/TOTAL_FEES_PAID/TOTAL_NET_POSITION) so every
+  file is self-describing and equals the JSON report totals (asserted in tests).
+- **CSV:** BOM byte first, CRLF endings, embedded `"` doubled; non-numeric
+  cells starting with `=`, `+`, `@`, `-` get an apostrophe prefix (OWASP CSV
+  formula-injection guard); numeric cells incl. negative money are emitted raw.
+- **XLSX:** one sheet (ledger/profit/statement); fully-numeric cells are written
+  via `setCellValue(BigDecimal.doubleValue())` at the format boundary only (xlsx
+  is IEEE 754 natively; exact well below 2^53); everything else is a text cell,
+  and string cells never evaluate as formulas → no guard needed.
+- **Web:** `api.downloadExport` = fetch-with-token → Blob → anchor click
+  (plain links can't auth); reads the `Content-Disposition` filename. Buttons on
+  the ledger page header (CSV/XLSX), host group cycles tab (profit), member
+  statement tab; inline exportError; 12 new i18n keys in all 4 locales.
+
+### 18.3 What shipped
+| Piece | Where |
+|---|---|
+| `ExportFormat`, `Table`, `ExportTables` | `com.tongtin.reports.export` |
+| `CsvRenderer` (BOM/RFC4180/guard) + `XlsxRenderer` (POI) | same package |
+| `ExportService.ledger/profit/statement` (Download record) | same package |
+| 3 endpoints + 404/403/401/400 wiring | `ReportController`, `MemberPortalController` |
+| `ExportTests` (5) + AuthzSweep rows (5 URLs) | `apps/api/src/test/java/com/tongtin` |
+| `download` helper + 3 api methods | `apps/web/lib/api.ts` |
+| Buttons + handlers x3 pages, i18n x12 (types + en/vi/km/zh) | `apps/web` |
+
+### 18.4 Verification
+- New `ExportTests` (5): CSV BOM/header/formula-guard/quoting + TOTAL equals JSON
+  total; POI xlsx round-trip (sheet name, header, numeric TOTAL_OUT); profit
+  settledHostFee total row; statement scoping (own 200 / foreign member 404 /
+  host 403 / anon 401); format default + 400. Plus 5 AuthzSweep URLs.
+- **mvn test → 184 tests, 0 failures** (179 + 5); zero-float grep gate green
+  (no `double`/`float` token in new main sources); web eslint + `tsc --noEmit`
+  clean. Nothing committed (standing rule).
+
+## 19. Wrap-up & cleanup (Step 31, 2026-10-08)
+
+### 19.1 Stale-docs refresh (no domain/API change — doc-gate not triggered)
+- **README.md**: badges Spring Boot 3.4.4 → **3.5.5** and Tests 119 → **184**;
+  module tree rewritten to the as-built package list (common, identity, members,
+  groups, cycles/bids, ledger+payments, dashboard, reports+export, notify,
+  memberportal, subscription, settings, demo); "10 Flyway Migrations (V1→V10)" →
+  **14 (V1→V14)**; testing section uses real 184-run output; "11 routes" → **13**;
+  roadmap table extended to **31/31 giai đoạn** (rows 20–31 added); export buttons
+  noted on ledger/statement routes; Dark Mode verified real (system preference).
+- **`docs/monkey_ai/00-INDEX.md`**: rewritten — correct `docs/monkey_ai/` paths,
+  `.agents/skills/tongtin-builder` skill ref, STATUS.md as live tracker, plan.md as
+  full step log, obsolete "first code step" removed.
+- **`docs/monkey_ai/02-ARCHITECTURE.md` §3**: module tree now as-built
+  (reports, memberportal, dashboard, demo added; bids in `cycles/bids`, payments
+  in `ledger/payments`, audit in `common/audit` noted).
+- **`docs/monkey_ai/03-BUILD-ROADMAP.md`**: rules STATUS path fixed; P2 note updated
+  (CSV/XLSX released Step 30, PDF templates still parked); Steps 18–31 post-MVP
+  table appended with live-tracker pointer.
+
+### 19.2 Docker click-through (fresh build of CURRENT code)
+`docker compose build` → `docker compose up -d`: postgres 16.15 + tongtin-api +
+tongtin-web all `(healthy)`; `GET /api/v1/health` UP direct and via web proxy;
+Flyway V1→V14 applied cleanly ON TOP of the existing dev volume (V14 newly applied,
+`flyway_schema_history` = 14 rows verified). Live Step 30 sweep: host ledger CSV 200
+(`tongtin-ledger-g2992.csv`, text/csv, BOM `ef bb bf`, TOTAL_IN row), ledger XLSX 200
+(valid OOXML), profit CSV 200 (TOTAL row), `format=pdf` → 400; member statement CSV
+200 (4 TOTAL rows, Unicode intact) + XLSX valid; `POST /members/4447/set-login`
+restored the fixture member password (`demo1234` — the pre-existing dev-DB password
+predated the current seeder); authz live: member→host ledger 403, host→member
+statement 403, anon→401.
+
+### 19.3 Final verification
+- `mvn test` → **184 tests, 0 failures, BUILD SUCCESS** (incl. ReleaseGateTests).
+- Web `eslint` + `tsc --noEmit` clean; `npm run build` → **13/13 routes** compiled
+  (11 static + 2 dynamic).
+- `git status`: only the Steps 19–31 source/doc changes, all uncommitted (standing
+  rule). Stack left RUNNING on the new images (`docker compose down` to stop).
+
+### 19.4 Open items (user-gated only)
+- §7.5 formula reminders (ranks 6–7) — need explicit user OK.
+- Parked P-items (incl. P2 PDF print templates) — parked unless requested.

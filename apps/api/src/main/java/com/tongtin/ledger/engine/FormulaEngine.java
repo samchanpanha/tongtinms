@@ -54,6 +54,31 @@ public final class FormulaEngine {
         return Math.addExact(Math.multiplyExact(amount, bps), 5000L) / 10000L;
     }
 
+    /**
+     * Late fee (01-DOMAIN 9.6). Pure: caller passes whole overdueDays since due_at
+     * and only calls for overdue obligations.
+     *   NONE            -> 0
+     *   FIXED           -> value, charged once regardless of overdueDays
+     *   PERCENT_PER_DAY -> HALF_UP(principal * value * overdueDays / 100),
+     *                     integer only: (principal * value * days + 50) / 100
+     */
+    public static long lateFee(String type, long value, long principal, long overdueDays) {
+        if (value < 0 || principal < 0 || overdueDays < 0) {
+            throw new FormulaException("lateFee requires value >= 0, principal >= 0, overdueDays >= 0");
+        }
+        if ("NONE".equals(type)) {
+            return 0L;
+        }
+        if ("FIXED".equals(type)) {
+            return value;
+        }
+        if ("PERCENT_PER_DAY".equals(type)) {
+            long raw = Math.multiplyExact(Math.multiplyExact(principal, value), overdueDays);
+            return Math.addExact(raw, 50L) / 100L;
+        }
+        throw new FormulaException("Unknown lateFeeType: " + type);
+    }
+
     private static long hostFee(CycleInput in, long grossPot) {
         if ("BIDDING_NO_FEE".equals(in.presetCode()) || "NONE".equals(in.hostFeeType())) {
             return 0L;

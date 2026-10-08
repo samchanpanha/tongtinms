@@ -1,10 +1,10 @@
 # Tong Tin Management System (Hệ Thống Quản Lý Hụi / Hội / ROSCA)
 
 [![Java 21](https://img.shields.io/badge/Java-21-orange.svg)](https://openjdk.org/)
-[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.4.4-brightgreen.svg)](https://spring.io/projects/spring-boot)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.5-brightgreen.svg)](https://spring.io/projects/spring-boot)
 [![Next.js](https://img.shields.io/badge/Next.js-16.3-black.svg)](https://nextjs.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://www.postgresql.org/)
-[![Tests](https://img.shields.io/badge/Tests-119%20passed-success.svg)](#testing--verification)
+[![Tests](https://img.shields.io/badge/Tests-184%20passed-success.svg)](#testing--verification)
 [![License](https://img.shields.io/badge/License-Proprietary-lightgrey.svg)]()
 
 > **Nền tảng quản lý Hụi / Hội (ROSCA — Rotating Savings and Credit Association) hiện đại, minh bạch và bảo mật**, thiết kế chuẩn xác theo tập quán tài chính truyền thống Việt Nam và thông lệ quốc tế.
@@ -20,22 +20,23 @@ tongtin/
 ├── apps/
 │   ├── api/                     # Spring Boot 3 (Java 21) REST Backend
 │   │   ├── src/main/java/com/tongtin/
-│   │   │   ├── identity/        # Xác thực JWT, Chủ Hụi & Hội viên, Sổ kiểm toán (Audit Trail)
+│   │   │   ├── common/          # Money (long minor units), lỗi chuẩn, bảo mật JWT, healthcheck
+│   │   │   ├── identity/        # Xác thực JWT, tự đăng ký Chủ Hụi, sổ kiểm toán (Audit Trail)
 │   │   │   ├── members/         # Quản lý danh bạ hội viên & phân quyền đăng nhập
 │   │   │   ├── groups/          # Cấu hình dây hụi (BIDDING / FIXED_EQUAL) & gán chân hụi
-│   │   │   ├── formulas/        # Động cơ tính toán tài chính thuần túy Java (Pure Zero-Dependency)
-│   │   │   ├── cycles/          # Vòng quay kỳ hụi, chốt kỳ & tính toán sổ cái
-│   │   │   ├── bidding/         # Bỏ thăm kín bảo mật (Sealed Bidding) & tự động phân xử
-│   │   │   ├── payments/        # Ghi nhận đóng tiền, phân bổ nợ & Idempotency Key
+│   │   │   ├── cycles/          # Vòng quay kỳ hụi, bỏ thăm kín (cycles/bids) & chốt kỳ
+│   │   │   ├── ledger/          # Công thức tài chính, nghĩa vụ nợ, đóng tiền & phí trễ hạn
 │   │   │   ├── dashboard/       # Bảng điều khiển KPI Chủ Hụi & phân tích lợi nhuận
-│   │   │   ├── me/              # Cổng thông tin Hội Viên (Member Portal)
+│   │   │   ├── reports/         # Sổ cái, báo cáo tiền thảo, sao kê hội viên & xuất CSV/XLSX
 │   │   │   ├── notify/          # Hệ thống thông báo nội bộ trong ứng dụng
-│   │   │   ├── reports/         # Sổ cái cân bằng, báo cáo tiền thảo & sao kê hội viên
+│   │   │   ├── memberportal/    # Cổng thông tin Hội Viên (Member Portal)
+│   │   │   ├── subscription/    # Gói cước SaaS, tích hợp ABA PayWay & nhật ký thanh toán
+│   │   │   ├── settings/        # Cấu hình hệ thống & gói tham số dây hụi mặc định
 │   │   │   └── demo/            # Trình nạp dữ liệu mẫu (Demo Fixture Seeder)
-│   │   └── src/main/resources/db/migration/  # 10 Flyway Migrations (V1 -> V10)
+│   │   └── src/main/resources/db/migration/  # 14 Flyway Migrations (V1 -> V14)
 │   │
 │   └── web/                     # Next.js 16 App Router + Tailwind CSS v4 Frontend
-│       ├── app/                 # 11 routes: landing, login, register, host portal, member portal
+│       ├── app/                 # 13 routes: landing, login, register, host portal, member portal
 │       ├── components/          # StatCard, StatusBadge, EmptyState, Navbar, v.v.
 │       └── lib/                 # Client API wrapper, formatMoney (1.000.000 đ), định dạng ngày
 │
@@ -88,7 +89,7 @@ chmod +x start.sh
 
 Kịch bản sẽ tự động:
 1. Khởi động PostgreSQL 16 trên cổng `5432` và chờ kiểm tra trạng thái sẵn sàng.
-2. Áp dụng toàn bộ 10 migration Flyway và khởi động API Spring Boot trên cổng `8080`.
+2. Áp dụng toàn bộ 14 migration Flyway (V1 → V14) và khởi động API Spring Boot trên cổng `8080`.
 3. Nạp bộ dữ liệu mẫu chuẩn (Dây hụi 10 kỳ với đầy đủ bỏ thăm, sổ cái cân bằng, tiền thảo và thanh toán).
 4. Khởi động giao diện Next.js trên cổng `3000`.
 
@@ -160,19 +161,23 @@ Sau khi khởi động với `--seed`, bạn có thể truy cập các dịch v�
 - [`/host/members`](http://localhost:3000/host/members): Danh bạ hội viên, tìm kiếm, tạo hồ sơ mới và cấp quyền đăng nhập.
 - [`/host/groups/new`](http://localhost:3000/host/groups/new): Trình tạo dây hụi mới với công cụ ước tính tổng gom và tiền thảo theo thời gian thực.
 - [`/host/groups/[id]`](http://localhost:3000/host/groups/1): Bàn điều khiển kỳ hụi — gán chân hụi, mở kỳ, nhập thăm, chốt sổ, giao hụi và ghi nhận đóng tiền.
-- [`/host/groups/[id]/ledger`](http://localhost:3000/host/groups/1/ledger): Báo cáo sổ cái kép chi tiết với chứng nhận cân bằng dòng tiền 100%.
+- [`/host/groups/[id]/ledger`](http://localhost:3000/host/groups/1/ledger): Báo cáo sổ cái kép chi tiết với chứng nhận cân bằng dòng tiền 100% — có nút xuất **CSV / Excel (.xlsx)**.
 
 ### 2. Phân Hệ Dành Cho Hội Viên (Member Portal)
 - [`/app`](http://localhost:3000/app): Cổng thông tin hội viên tổng hợp các dây hụi đã tham gia.
-- [`/app/groups/[id]`](http://localhost:3000/app/groups/1): Giao diện bỏ thăm kín trực tiếp và bảng sao kê tài chính cá nhân (`contributed`, `received`, `netPosition`).
+- [`/app/groups/[id]`](http://localhost:3000/app/groups/1): Giao diện bỏ thăm kín trực tiếp và bảng sao kê tài chính cá nhân (`contributed`, `received`, `netPosition`) — kèm nút xuất **CSV / Excel (.xlsx)**.
 - [`/notifications`](http://localhost:3000/notifications): Trung tâm thông báo sự kiện (mở kỳ, kết quả bỏ thăm, nhận tiền, hoàn thành dây hụi).
 
 ---
 
 ## 🧪 Kiểm Thử & Đảm Bảo Chất Lượng (Testing & Verification)
 
-### Kiểm Thử Backend (JUnit 5 + Spring Boot Test)
-Toàn bộ hệ thống backend được bao phủ bởi **119 ca kiểm thử tự động**, bao gồm kiểm thử toán học biên, ma trận phân quyền chéo tenant và kiểm thử tương tranh:
+### Kiểm Thử Backend (JUnit 5 + Spring Boot Test + Testcontainers)
+Toàn bộ hệ thống backend được bao phủ bởi **184 ca kiểm thử tự động**, bao gồm kiểm thử toán học biên, ma trận phân quyền chéo tenant, kiểm thử tương tranh và kiểm thử xuất file CSV/XLSX.
+
+Từ **Step 28 (2026-10-08)** bộ test chạy **hermetic** bằng Testcontainers: mỗi lần `mvn test`
+tự khởi động một container `postgres:16` cô lập (Flyway migrate toàn bộ schema từ đầu) —
+**không đụng vào database dev**, không cần `docker compose up` trước. Chỉ cần Docker đang chạy:
 
 ```bash
 cd apps/api
@@ -180,7 +185,7 @@ mvn test
 ```
 ```
 [INFO] Results:
-[INFO] Tests run: 119, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 184, Failures: 0, Errors: 0, Skipped: 0
 [INFO] BUILD SUCCESS
 ```
 
@@ -190,14 +195,14 @@ Mã nguồn frontend được kiểm tra nghiêm ngặt theo các tiêu chuẩn 
 ```bash
 cd apps/web
 npm run lint     # 0 errors, 0 warnings
-npm run build    # 11/11 routes tĩnh và động biên dịch thành công
+npm run build    # 13/13 routes tĩnh và động biên dịch thành công
 ```
 
 ---
 
-## 📜 Tiến Độ Thực Hiện 18 Giai Đoạn (Build Roadmap)
+## 📜 Tiến Độ Thực Hiện 31 Giai Đoạn (Build Roadmap)
 
-Hệ thống đã hoàn tất trọn vẹn **18/18 giai đoạn** theo đúng lộ trình đặc tả:
+Hệ thống đã hoàn tất trọn vẹn **31/31 giai đoạn** theo đúng lộ trình đặc tả (`docs/monkey_ai/STATUS.md` + `plan.md`):
 
 | Giai Đoạn | Tên Giai Đoạn | Nội Dung Hoàn Thành |
 |:---:|---|---|
@@ -218,9 +223,21 @@ Hệ thống đã hoàn tất trọn vẹn **18/18 giai đoạn** theo đúng l�
 | **14** | **In-App Notifications** | Hệ thống thông báo nội bộ đa sự kiện theo thời gian thực, Flyway V9 (`notifications`) |
 | **15** | **Reports** | Báo cáo tiền thảo Chủ Hụi, sao kê vị thế Hội Viên và tóm tắt kỳ hụi công khai |
 | **16** | **Hardening** | Sổ kiểm toán (`audit_events`), Idempotency Key (Flyway V10), kiểm thử bảo mật & Demo Seeder |
-| **17** | **Preview Polish** | Giao diện tiếng Việt chuẩn mực, định dạng `1.000.000 đ`, Dark Mode, 11 routes, `start.sh` |
+| **17** | **Preview Polish** | Giao diện tiếng Việt chuẩn mực, định dạng `1.000.000 đ`, Dark Mode, 13 routes, `start.sh` |
 | **18** | **Final Delivery** | Kiểm thử đầu cuối (E2E) trọn vẹn 10 quy trình, tài liệu hướng dẫn và hoàn tất chuyển giao |
 | **19** | **SaaS Subscriptions & ABA PayWay** | Tặng 1 tháng dùng thử miễn phí khi đăng ký Chủ Hụi, tích hợp cổng thanh toán ABA PayWay (HMAC-SHA512 KHQR & Card theo [developer.payway.com.kh](https://developer.payway.com.kh/)), cấu hình gói cước và quản trị hệ thống qua Admin Panel (Flyway V11) |
+| **20** | **Member Group Settings** | Cài đặt hệ thống (`system_settings`) và gói tham số công thức mặc định cho dây hụi mới (Flyway V?) |
+| **21** | **Bid Rules & Tiebreaking** | Chạm trần lãi suất, đấu giá vòng 2 (tiebreak), san đều tiền thảo qua nhiều phiên bỏ thăm |
+| **22** | **Late Fee Formula** | Tiền phạt rút hụi sớm / trễ hạn theo công thức, minh bạch trong sổ cái (Flyway V12 `payment_events`) |
+| **23** | **Subscription Funnel** | Trang đăng ký, quyền truy cập theo gói (PLUS/PREMIUM), giới hạn dây hụi, gia hạn & nhắc hết hạn (Flyway V13) |
+| **24** | **Cycle Public Summary** | Tóm tắt kỳ hụi công khai cho hội viên, minh bạch kết quả chốt kỳ |
+| **25** | **Settings & Rule Presets** | Quản lý gói cước, xáo trộn thứ tự bỏ thăm, lịch sử thay đổi, kiểm thử chéo |
+| **26** | **Multi-Currency Hardening** | Hỗ trợ USD/KHR theo exponent, làm tròn tài chính chuẩn, kiểm soát trạng thái tiền tệ |
+| **27** | **Cycle Settings UI** | Giao diện cấu hình kỳ hụi nâng cao, combo tham số và nhập liệu tiện dụng |
+| **28** | **Hermetic Tests & Release Gate** | Testcontainers tách biệt hoàn toàn khỏi DB dev, ReleaseGateTests chặn số thực, toàn bộ suite xanh |
+| **29** | **Late Fees Delivery** | Thu phí trễ hạn, chốt sổ tự động, queuing thanh toán, hiển thị đủ trên sổ cái & sao kê (Flyway V14) |
+| **30** | **CSV / Excel Exports** | Xuất sổ cái, báo cáo tiền thảo & sao kê hội viên ra **CSV** và **XLSX (Apache POI)** — cột đầy đủ, dòng TOTAL, phòng chống formula injection |
+| **31** | **Wrap-up & Cleanup** | Dọn tài liệu lỗi thời (README, chỉ mục, kiến trúc), xác minh toàn bộ qua Docker compose, kiểm tra suite + build cuối cùng |
 
 ---
 

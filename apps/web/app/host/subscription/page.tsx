@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { useLanguage } from "@/lib/i18n";
 import { formatMoney, formatDate, formatDateTime } from "@/lib/format";
@@ -118,6 +118,12 @@ export default function HostSubscriptionPage() {
   const [isSimulating, setIsSimulating] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
 
+  // ABA PayWay gateway return flow: ?status=...&tran_id=... on this page
+  const [returnNotice, setReturnNotice] = useState<
+    "verifying" | "success" | "cancelled" | "failed" | null
+  >(null);
+  const handledGatewayReturn = useRef(false);
+
   useEffect(() => {
     let ignore = false;
     Promise.all([
@@ -151,13 +157,55 @@ export default function HostSubscriptionPage() {
     setRefreshKey((k) => k + 1);
   };
 
+  // Handle return from the ABA PayWay gateway. Query params are only a
+  // signal to verify - the server re-checks the transaction with the
+  // gateway before activating anything.
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      if (handledGatewayReturn.current) return;
+      const params = new URLSearchParams(window.location.search);
+      const tranId = params.get("tran_id");
+      if (!tranId) return;
+      handledGatewayReturn.current = true;
+
+      const statusParam = params.get("status");
+      params.delete("status");
+      params.delete("tran_id");
+      const qs = params.toString();
+      window.history.replaceState(
+        null,
+        "",
+        window.location.pathname + (qs ? `?${qs}` : "") + window.location.hash
+      );
+
+      if (statusParam === "cancelled" || statusParam === "canceled") {
+        setReturnNotice("cancelled");
+        return;
+      }
+
+      setReturnNotice("verifying");
+      api
+        .verifySubscriptionOrder(tranId)
+        .then(() => {
+          setReturnNotice("success");
+          setRefreshKey((k) => k + 1);
+        })
+        .catch(() => setReturnNotice("failed"));
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
   const handleOpenCheckout = async (plan: Plan) => {
     setSelectedPlan(plan);
     setCheckoutData(null);
     setPaymentSuccess(false);
     setIsCheckoutLoading(true);
     try {
-      const data = await api.checkoutPayWay(plan.id, "cards,abapay_khqr,abapay_deeplink");
+      const data = await api.checkoutPayWay(
+        plan.id,
+        "cards,abapay_khqr,abapay_deeplink",
+        `${window.location.origin}/host/subscription`
+      );
       setCheckoutData(data);
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : t.subscription.paymentError);
@@ -223,6 +271,35 @@ export default function HostSubscriptionPage() {
         <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300 flex items-center gap-3">
           <AlertTriangle className="h-5 w-5 shrink-0" />
           <span>{error}</span>
+        </div>
+      )}
+
+      {/* ABA PayWay gateway return notices */}
+      {returnNotice === "verifying" && (
+        <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-800 dark:border-sky-900/50 dark:bg-sky-950/40 dark:text-sky-300 flex items-center gap-3">
+          <RefreshCw className="h-5 w-5 shrink-0 animate-spin" />
+          <span>{t.subscription.verifyingPayment}</span>
+        </div>
+      )}
+      {returnNotice === "success" && (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300 flex items-center gap-3">
+          <CheckCircle2 className="h-5 w-5 shrink-0" />
+          <span>
+            <strong>{t.subscription.paymentSuccess}</strong>{" "}
+            {t.subscription.paymentSuccessDesc}
+          </span>
+        </div>
+      )}
+      {returnNotice === "cancelled" && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-300 flex items-center gap-3">
+          <AlertTriangle className="h-5 w-5 shrink-0" />
+          <span>{t.subscription.paymentCancelled}</span>
+        </div>
+      )}
+      {returnNotice === "failed" && (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300 flex items-center gap-3">
+          <AlertTriangle className="h-5 w-5 shrink-0" />
+          <span>{t.subscription.paymentError}</span>
         </div>
       )}
 

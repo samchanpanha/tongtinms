@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import { formatMoney, formatDateTime } from "@/lib/format";
 import { useLanguage } from "@/lib/i18n";
 import { EmptyState } from "@/components/EmptyState";
-import { FileSpreadsheet, ArrowLeft, Loader2, ArrowUpRight, ArrowDownLeft, Shield } from "lucide-react";
+import { FileSpreadsheet, ArrowLeft, Loader2, ArrowUpRight, ArrowDownLeft, Shield, Download } from "lucide-react";
 
 type LedgerData = Awaited<ReturnType<typeof api.getGroupLedger>>;
 
@@ -20,6 +20,22 @@ export default function GroupLedgerPage({
   const [data, setData] = useState<LedgerData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  const handleExport = async (format: "csv" | "xlsx") => {
+    setExportError(null);
+    setExporting(true);
+    try {
+      await api.exportLedger(id, format);
+    } catch (err: unknown) {
+      setExportError(
+        err instanceof Error ? err.message : t.groupLedger.exportError
+      );
+    } finally {
+      setExporting(false);
+    }
+  };
 
   useEffect(() => {
     let ignore = false;
@@ -85,6 +101,29 @@ export default function GroupLedgerPage({
           <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
             {t.groupLedger.subtitle(data.currency)}
           </p>
+        </div>
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => handleExport("csv")}
+              disabled={exporting}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 cursor-pointer disabled:opacity-50 dark:border-emerald-700/60 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/70"
+            >
+              <Download className="h-3.5 w-3.5" />
+              {t.groupLedger.exportCsv}
+            </button>
+            <button
+              onClick={() => handleExport("xlsx")}
+              disabled={exporting}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 cursor-pointer disabled:opacity-50 dark:border-emerald-700/60 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/70"
+            >
+              <Download className="h-3.5 w-3.5" />
+              {t.groupLedger.exportXlsx}
+            </button>
+          </div>
+          {exportError && (
+            <span className="text-xs text-red-600 dark:text-red-400">{exportError}</span>
+          )}
         </div>
       </div>
 

@@ -228,14 +228,20 @@ class AuthzSweepTests {
             {"POST", "/api/v1/groups/{g}/payments",
                     "{\"amountMinor\":800000,\"currency\":\"VND\",\"allocations\":[{\"ledgerEntryId\":99999999,\"amountMinor\":800000}]}"},
             {"GET", "/api/v1/groups/{g}/debts", null},
+            {"POST", "/api/v1/groups/{g}/late-fees/assess", null},
             {"GET", "/api/v1/groups/{g}/ledger", null},
             {"GET", "/api/v1/groups/{g}/profit", null},
+            {"GET", "/api/v1/groups/{g}/export/ledger?format=csv", null},
+            {"GET", "/api/v1/groups/{g}/export/ledger?format=xlsx", null},
+            {"GET", "/api/v1/groups/{g}/export/profit?format=csv", null},
     };
 
     private static final String[][] MEMBER_PORTAL = {
             {"GET", "/api/v1/me/groups", null},
             {"GET", "/api/v1/me/groups/{g}/balance", null},
             {"GET", "/api/v1/me/groups/{g}/statement", null},
+            {"GET", "/api/v1/me/groups/{g}/export/statement?format=csv", null},
+            {"GET", "/api/v1/me/groups/{g}/export/statement?format=xlsx", null},
             {"GET", "/api/v1/me/groups/{g}/cycles", null},
             {"POST", "/api/v1/me/cycles/{c}/bids", "{\"shareId\":99999999,\"amountMinor\":200000}"},
     };
