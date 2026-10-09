@@ -24,6 +24,7 @@
     <testcontainers.version>1.21.4</testcontainers.version>
     <!-- Step 30: real .xlsx export -->
     <poi.version>5.5.1</poi.version>
+    <zxing.version>3.5.3</zxing.version>
   </properties>
 
   <dependencies>
@@ -89,6 +90,16 @@
       <groupId>org.apache.poi</groupId>
       <artifactId>poi-ooxml</artifactId>
       <version>${poi.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.google.zxing</groupId>
+      <artifactId>core</artifactId>
+      <version>${zxing.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.google.zxing</groupId>
+      <artifactId>javase</artifactId>
+      <version>${zxing.version}</version>
     </dependency>
   </dependencies>
 

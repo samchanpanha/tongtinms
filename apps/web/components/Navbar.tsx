@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { clearAuth, getStoredAuth, LoginResponse } from "@/lib/api";
 import { useLanguage } from "@/lib/i18n";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
-import { Users, LayoutDashboard, Wallet, LogOut, Bell, Shield, ArrowRight } from "lucide-react";
+import { Users, LayoutDashboard, Wallet, LogOut, Bell, Shield, ArrowRight, Send } from "lucide-react";
 
 export function Navbar() {
   const pathname = usePathname();
@@ -107,6 +107,17 @@ export function Navbar() {
                   >
                     <Wallet className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                     <span>{t.navbar.subscription}</span>
+                  </Link>
+                  <Link
+                    href="/host/telegram"
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                      pathname === "/host/telegram"
+                        ? "bg-sky-100 text-sky-900 dark:bg-sky-950/60 dark:text-sky-200"
+                        : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
+                    }`}
+                  >
+                    <Send className="h-4 w-4 text-sky-600 dark:text-sky-400" />
+                    <span>{t.navbar.telegram}</span>
                   </Link>
                 </>
               )}

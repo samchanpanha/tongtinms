@@ -129,8 +129,8 @@ public class AdminSettingsTests {
     void testCatalogGroupedAndSecretsMasked() {
         SettingsViewDto view = settingsService.getView();
 
-        assertEquals(4, view.categories().size());
-        assertEquals(List.of("PAYMENT", "SUBSCRIPTION", "GROUPS", "SECURITY"),
+        assertEquals(5, view.categories().size());
+        assertEquals(List.of("PAYMENT", "SUBSCRIPTION", "GROUPS", "SECURITY", "TELEGRAM"),
                 view.categories().stream().map(SettingCategoryDto::code).toList());
 
         SettingDto apiKey = findSetting(view, "payway_api_key");
@@ -175,7 +175,7 @@ public class AdminSettingsTests {
         String body = mockMvc.perform(get("/api/v1/admin/settings")
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.categories.length()").value(4))
+                .andExpect(jsonPath("$.categories.length()").value(5))
                 .andReturn().getResponse().getContentAsString();
 
         assertFalse(body.contains("4c05336bf1f621375d86242aebe3daee7fa5a1c3"));

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, use } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { api } from "@/lib/api";
 import { formatMoney, formatDateTime } from "@/lib/format";
 import { useLanguage } from "@/lib/i18n";
@@ -17,11 +18,14 @@ import {
   Loader2,
   Send,
   Download,
+  QrCode,
+  X,
 } from "lucide-react";
 
 type MyGroup = Awaited<ReturnType<typeof api.getMyGroups>>[number];
 type PublicCycle = Awaited<ReturnType<typeof api.getMyGroupCycles>>[number];
 type MemberStatement = Awaited<ReturnType<typeof api.getMyGroupStatement>>;
+type StatementEntry = NonNullable<MemberStatement["shares"]>[number]["entries"][number];
 
 export default function MemberGroupDetailPage({
   params,
@@ -45,6 +49,34 @@ export default function MemberGroupDetailPage({
   const [bidSuccess, setBidSuccess] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+
+  const [qrEntry, setQrEntry] = useState<StatementEntry | null>(null);
+  const [qrImageUrl, setQrImageUrl] = useState<string | null>(null);
+  const [qrLoading, setQrLoading] = useState(false);
+  const [qrError, setQrError] = useState<string | null>(null);
+
+  const openQr = async (entry: StatementEntry) => {
+    if (qrImageUrl) URL.revokeObjectURL(qrImageUrl);
+    setQrEntry(entry);
+    setQrImageUrl(null);
+    setQrError(null);
+    setQrLoading(true);
+    try {
+      const url = await api.fetchObligationQr(entry.entryId);
+      setQrImageUrl(url);
+    } catch (err: unknown) {
+      setQrError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setQrLoading(false);
+    }
+  };
+
+  const closeQr = () => {
+    if (qrImageUrl) URL.revokeObjectURL(qrImageUrl);
+    setQrImageUrl(null);
+    setQrError(null);
+    setQrEntry(null);
+  };
 
   const handleStatementExport = async (format: "csv" | "xlsx") => {
     setExportError(null);
@@ -439,6 +471,7 @@ export default function MemberGroupDetailPage({
                           <th className="px-3 py-2.5">{t.memberGroupDetail.colDescription}</th>
                           <th className="px-3 py-2.5">{t.memberGroupDetail.colAmount}</th>
                           <th className="px-3 py-2.5">{t.memberGroupDetail.colStatus}</th>
+                          <th className="px-3 py-2.5" />
                           <th className="py-2.5 pl-3 pr-6 text-right">
                             {t.memberGroupDetail.colRunningBalance}
                           </th>
@@ -465,6 +498,17 @@ export default function MemberGroupDetailPage({
                               <td className="px-3 py-3">
                                 <span className="font-medium text-emerald-600">{e.status}</span>
                               </td>
+                              <td className="px-3 py-3">
+                                {e.khqr && (
+                                  <button
+                                    onClick={() => openQr(e)}
+                                    className="inline-flex items-center gap-1 rounded-lg border border-zinc-300 px-2.5 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 cursor-pointer dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                                  >
+                                    <QrCode className="h-3.5 w-3.5" />
+                                    {t.memberGroupDetail.viewQrBtn}
+                                  </button>
+                                )}
+                              </td>
                               <td className="py-3 pl-3 pr-6 text-right font-bold font-mono">
                                 {balance
                                   ? formatMoney(balance.amountMinor, balance.currency)
@@ -486,6 +530,65 @@ export default function MemberGroupDetailPage({
               description={t.memberGroupDetail.emptyStatementDesc}
             />
           )}
+        </div>
+      )}
+
+      {/* Modal: KHQR */}
+      {qrEntry && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-3xl border border-zinc-200 bg-white p-6 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="flex items-center justify-between pb-4 border-b border-zinc-200 dark:border-zinc-800">
+              <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-50">
+                {t.memberGroupDetail.qrModalTitle}
+              </h3>
+              <button
+                onClick={closeQr}
+                className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="mt-5 flex flex-col items-center space-y-4">
+              {qrLoading ? (
+                <Loader2 className="h-14 w-14 animate-spin text-zinc-400" />
+              ) : qrError ? (
+                <p className="text-sm font-medium text-red-600 dark:text-red-400">{qrError}</p>
+              ) : qrImageUrl ? (
+                <Image
+                  src={qrImageUrl}
+                  alt={t.memberGroupDetail.qrModalTitle}
+                  width={256}
+                  height={256}
+                  unoptimized
+                  className="h-64 w-64 rounded-xl border border-zinc-200 bg-white p-2 dark:border-zinc-800"
+                />
+              ) : null}
+              <p className="text-center text-xs text-zinc-500 dark:text-zinc-400">
+                {t.memberGroupDetail.qrModalDesc}
+              </p>
+              <div className="w-full space-y-1.5 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-zinc-500">{t.memberGroupDetail.qrModalCycle}</span>
+                  <span className="font-bold">{t.memberGroupDetail.cycleNo(qrEntry.cycleNo)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-500">{t.memberGroupDetail.qrModalAmount}</span>
+                  <span className="font-bold text-emerald-600">
+                    {qrEntry.remaining
+                      ? formatMoney(qrEntry.remaining.amountMinor, qrEntry.remaining.currency)
+                      : "-"}
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={closeQr}
+                className="w-full rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-500 cursor-pointer"
+              >
+                {t.memberGroupDetail.closeBtn}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

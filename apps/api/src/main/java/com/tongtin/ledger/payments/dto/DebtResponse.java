@@ -16,5 +16,6 @@ public record DebtResponse(
         String currency,
         String status,
         Instant dueAt,
-        long overdueDays) {
+        long overdueDays,
+        String khqr) {
 }

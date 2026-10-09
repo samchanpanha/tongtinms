@@ -1,12 +1,14 @@
 "use client";
 
-import React, { useEffect, useState, use } from "react";
+import React, { useEffect, useState, useMemo, use } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { api } from "@/lib/api";
 import {
   formatMoney,
   formatDateTime,
   formatPhone,
+  formatBytes,
   getCycleUnitLabel,
 } from "@/lib/format";
 import { useLanguage } from "@/lib/i18n";
@@ -25,12 +27,19 @@ import {
   X,
   CreditCard,
   Download,
+  FileText,
+  Upload,
+  Trash2,
+  Eye,
+  QrCode,
+  Zap,
 } from "lucide-react";
 
 type GroupDetails = Awaited<ReturnType<typeof api.getGroup>>;
 type GroupShare = Awaited<ReturnType<typeof api.getGroupShares>>[number];
 type GroupCycle = Awaited<ReturnType<typeof api.getGroupCycles>>[number];
 type GroupDebt = Awaited<ReturnType<typeof api.getDebts>>[number];
+type GroupPayment = Awaited<ReturnType<typeof api.getPayments>>[number];
 type MemberItem = Awaited<ReturnType<typeof api.getMembers>>[number];
 
 export default function GroupDetailPage({
@@ -45,6 +54,7 @@ export default function GroupDetailPage({
   const [shares, setShares] = useState<GroupShare[]>([]);
   const [cycles, setCycles] = useState<GroupCycle[]>([]);
   const [debts, setDebts] = useState<GroupDebt[]>([]);
+  const [payments, setPayments] = useState<GroupPayment[]>([]);
   const [members, setMembers] = useState<MemberItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"shares" | "cycles" | "payments">("cycles");
@@ -52,6 +62,7 @@ export default function GroupDetailPage({
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [uploadingPaymentId, setUploadingPaymentId] = useState<number | null>(null);
 
   // Modals & form state
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -68,7 +79,73 @@ export default function GroupDetailPage({
   const [paymentMethod, setPaymentMethod] = useState("CASH");
   const [refreshKey, setRefreshKey] = useState(0);
 
+  const [showQuickPayModal, setShowQuickPayModal] = useState(false);
+  const [quickPayMemberId, setQuickPayMemberId] = useState<number | null>(null);
+  const [quickPayAmountMinor, setQuickPayAmountMinor] = useState<number>(0);
+  const [quickPayMethod, setQuickPayMethod] = useState("CASH");
+  const [quickPayNote, setQuickPayNote] = useState("");
+  const [quickPayReceipt, setQuickPayReceipt] = useState<File | null>(null);
+  const [quickPaying, setQuickPaying] = useState(false);
+
+  const [qrDebt, setQrDebt] = useState<GroupDebt | null>(null);
+  const [qrImageUrl, setQrImageUrl] = useState<string | null>(null);
+  const [qrLoading, setQrLoading] = useState(false);
+  const [qrError, setQrError] = useState<string | null>(null);
+
   const reloadAll = () => setRefreshKey((k) => k + 1);
+
+  // Step 36: members with outstanding debt, grouped for the quick-pay picker.
+  const debtByMember = useMemo(() => {
+    const map = new Map<
+      number,
+      { memberProfileId: number; obligationCount: number; totalRemaining: number; currency: string }
+    >();
+    for (const d of debts) {
+      if (d.memberProfileId == null) continue;
+      const entry = map.get(d.memberProfileId);
+      if (entry) {
+        entry.obligationCount += 1;
+        entry.totalRemaining += d.remainingMinor;
+      } else {
+        map.set(d.memberProfileId, {
+          memberProfileId: d.memberProfileId,
+          obligationCount: 1,
+          totalRemaining: d.remainingMinor,
+          currency: d.currency,
+        });
+      }
+    }
+    return [...map.values()];
+  }, [debts]);
+
+  const assignQuickPayMember = (memberProfileId: number) => {
+    setQuickPayMemberId(memberProfileId);
+    const memberDebt = debtByMember.find((m) => m.memberProfileId === memberProfileId);
+    setQuickPayAmountMinor(memberDebt?.totalRemaining ?? 0);
+  };
+
+  const openQr = async (debt: GroupDebt) => {
+    if (qrImageUrl) URL.revokeObjectURL(qrImageUrl);
+    setQrDebt(debt);
+    setQrImageUrl(null);
+    setQrError(null);
+    setQrLoading(true);
+    try {
+      const url = await api.fetchObligationQr(debt.ledgerEntryId);
+      setQrImageUrl(url);
+    } catch (err) {
+      setQrError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setQrLoading(false);
+    }
+  };
+
+  const closeQr = () => {
+    if (qrImageUrl) URL.revokeObjectURL(qrImageUrl);
+    setQrImageUrl(null);
+    setQrError(null);
+    setQrDebt(null);
+  };
 
   useEffect(() => {
     let ignore = false;
@@ -77,14 +154,16 @@ export default function GroupDetailPage({
       api.getGroupShares(id),
       api.getGroupCycles(id),
       api.getDebts(id),
+      api.getPayments(id),
       api.getMembers(),
     ])
-      .then(([g, sh, cy, db, mb]) => {
+      .then(([g, sh, cy, db, pm, mb]) => {
         if (!ignore) {
           setGroup(g);
           setShares(sh);
           setCycles(cy);
           setDebts(db);
+          setPayments(pm);
           setMembers(mb);
           setActionError(null);
           setLoading(false);
@@ -150,6 +229,50 @@ export default function GroupDetailPage({
     } finally {
       setExporting(false);
     }
+  };
+
+  const handleReceiptUpload = async (paymentId: number, file: File | null) => {
+    if (!file) return;
+    setActionError(null);
+    setActionSuccess(null);
+    setUploadingPaymentId(paymentId);
+    try {
+      await api.uploadPaymentAttachment(paymentId, file);
+      setActionSuccess(t.hostGroupDetail.msgReceiptUploadSuccess);
+      reloadAll();
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : t.hostGroupDetail.msgReceiptUploadError);
+    } finally {
+      setUploadingPaymentId(null);
+    }
+  };
+
+  const handleReceiptDelete = async (attachmentId: number) => {
+    setActionError(null);
+    setActionSuccess(null);
+    try {
+      await api.deleteAttachment(attachmentId);
+      setActionSuccess(t.hostGroupDetail.msgReceiptDeleteSuccess);
+      reloadAll();
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : t.hostGroupDetail.msgReceiptUploadError);
+    }
+  };
+
+  const handleReceiptDownload = async (attachmentId: number, name: string) => {
+    setActionError(null);
+    setActionSuccess(null);
+    try {
+      await api.downloadAttachment(attachmentId, name);
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : t.hostGroupDetail.msgReceiptDownloadError);
+    }
+  };
+
+  const paymentMethodLabel = (method: string) => {
+    if (method === "CASH") return t.hostGroupDetail.methodCash;
+    if (method === "BANK_TRANSFER") return t.hostGroupDetail.methodBank;
+    return t.hostGroupDetail.methodOther;
   };
 
   const handleAssignShare = async (e: React.FormEvent) => {
@@ -228,6 +351,42 @@ export default function GroupDetailPage({
       reloadAll();
     } catch (err: unknown) {
       setActionError(err instanceof Error ? err.message : t.hostGroupDetail.msgPaymentError);
+    }
+  };
+
+  const handleQuickPay = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickPayMemberId || quickPayAmountMinor <= 0) return;
+    setActionError(null);
+    setQuickPaying(true);
+    try {
+      const idempotencyKey = `QP-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+      const memberDebt = debtByMember.find((m) => m.memberProfileId === quickPayMemberId);
+      const currency = memberDebt?.currency ?? group?.currency ?? "VND";
+      const payment = await api.quickPay(
+        id,
+        {
+          memberProfileId: quickPayMemberId,
+          amountMinor: quickPayAmountMinor,
+          currency,
+          method: quickPayMethod,
+          note: quickPayNote.trim() || undefined,
+          allocateLateFees: true,
+        },
+        idempotencyKey
+      );
+      if (quickPayReceipt) {
+        await api.uploadPaymentAttachment(payment.id, quickPayReceipt);
+      }
+      setShowQuickPayModal(false);
+      setQuickPayReceipt(null);
+      setQuickPayNote("");
+      setActionSuccess(t.hostGroupDetail.msgQuickPaySuccess);
+      reloadAll();
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : t.hostGroupDetail.msgPaymentError);
+    } finally {
+      setQuickPaying(false);
     }
   };
 
@@ -604,6 +763,21 @@ export default function GroupDetailPage({
               <span className="text-xs text-zinc-500">
                 {t.hostGroupDetail.totalPending(debts.length)}
               </span>
+              {debtByMember.length > 0 && (
+                <button
+                  onClick={() => {
+                    assignQuickPayMember(debtByMember[0].memberProfileId);
+                    setQuickPayMethod("CASH");
+                    setQuickPayNote("");
+                    setQuickPayReceipt(null);
+                    setShowQuickPayModal(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-600 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 cursor-pointer dark:border-emerald-700/60 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/70"
+                >
+                  <Zap className="h-3.5 w-3.5" />
+                  {t.hostGroupDetail.quickPayBtn}
+                </button>
+              )}
               {group.lateFeeType !== "NONE" && (
                 <button
                   onClick={handleAssessLateFees}
@@ -658,16 +832,27 @@ export default function GroupDetailPage({
                         {formatDateTime(d.dueAt, language)}
                       </td>
                       <td className="py-3.5 pl-3 pr-6 text-right">
-                        <button
-                          onClick={() => {
-                            setPaymentDebt(d);
-                            setShowPaymentModal(true);
-                          }}
-                          className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 cursor-pointer"
-                        >
-                          <CreditCard className="h-3.5 w-3.5" />
-                          {t.hostGroupDetail.collectMoneyBtn}
-                        </button>
+                        <div className="flex items-center justify-end gap-2">
+                          {d.khqr && (
+                            <button
+                              onClick={() => openQr(d)}
+                              className="inline-flex items-center gap-1 rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 cursor-pointer dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                            >
+                              <QrCode className="h-3.5 w-3.5" />
+                              {t.hostGroupDetail.viewQrBtn}
+                            </button>
+                          )}
+                          <button
+                            onClick={() => {
+                              setPaymentDebt(d);
+                              setShowPaymentModal(true);
+                            }}
+                            className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 cursor-pointer"
+                          >
+                            <CreditCard className="h-3.5 w-3.5" />
+                            {t.hostGroupDetail.collectMoneyBtn}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -675,6 +860,114 @@ export default function GroupDetailPage({
               </table>
             </div>
           )}
+
+          {/* Payment History & Receipts */}
+          <div className="mt-8">
+            <h3 className="font-bold text-base text-zinc-900 dark:text-zinc-50">
+              {t.hostGroupDetail.paymentHistoryTitle}
+            </h3>
+
+            {payments.length === 0 ? (
+              <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
+                {t.hostGroupDetail.paymentHistoryEmpty}
+              </p>
+            ) : (
+              <div className="mt-4 space-y-3">
+                {payments.map((p) => (
+                  <div
+                    key={p.id}
+                    className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60"
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm sm:grid-cols-3">
+                        <div>
+                          <span className="text-xs text-zinc-400">{t.hostGroupDetail.historyColDate}</span>
+                          <p className="font-medium text-zinc-900 dark:text-zinc-50">
+                            {formatDateTime(p.paidAt, language)}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-xs text-zinc-400">{t.hostGroupDetail.historyColAmount}</span>
+                          <p className="font-bold text-emerald-600">
+                            {formatMoney(p.amountMinor, p.currency)}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-xs text-zinc-400">{t.hostGroupDetail.historyColMethod}</span>
+                          <p className="font-medium text-zinc-900 dark:text-zinc-50">
+                            {paymentMethodLabel(p.method)}
+                          </p>
+                        </div>
+                        <div className="col-span-2 sm:col-span-1">
+                          <span className="text-xs text-zinc-400">{t.hostGroupDetail.historyColObligations}</span>
+                          <p className="font-medium text-zinc-900 dark:text-zinc-50">{p.allocations.length}</p>
+                        </div>
+                        <div className="col-span-2 sm:col-span-2">
+                          <span className="text-xs text-zinc-400">{t.hostGroupDetail.historyColNote}</span>
+                          <p className="font-medium text-zinc-900 dark:text-zinc-50">{p.note || "—"}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex shrink-0 items-center gap-2">
+                        <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 dark:border-emerald-700/60 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/70">
+                          {uploadingPaymentId === p.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Upload className="h-3.5 w-3.5" />
+                          )}
+                          {uploadingPaymentId === p.id
+                            ? t.hostGroupDetail.receiptsUploading
+                            : t.hostGroupDetail.receiptsUpload}
+                          <input
+                            type="file"
+                            className="hidden"
+                            disabled={uploadingPaymentId !== null}
+                            onChange={(e) => {
+                              handleReceiptUpload(p.id, e.target.files?.[0] ?? null);
+                              e.target.value = "";
+                            }}
+                          />
+                        </label>
+                      </div>
+                    </div>
+
+                    {p.attachments.length > 0 && (
+                      <div className="mt-4 border-t border-zinc-100 pt-3 dark:border-zinc-800">
+                        <div className="flex flex-wrap gap-2">
+                          {p.attachments.map((att) => (
+                            <div
+                              key={att.id}
+                              className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50/60 px-3 py-2 dark:border-zinc-700/60 dark:bg-zinc-800/40"
+                            >
+                              <FileText className="h-4 w-4 shrink-0 text-zinc-400" />
+                              <span className="max-w-48 truncate text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                                {att.originalName}
+                              </span>
+                              <span className="text-[10px] text-zinc-400">{formatBytes(att.sizeBytes)}</span>
+                              <button
+                                onClick={() => handleReceiptDownload(att.id, att.originalName)}
+                                className="rounded-md p-1 text-emerald-600 hover:bg-emerald-100 dark:hover:bg-emerald-950/40"
+                                title={t.hostGroupDetail.receiptsView}
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleReceiptDelete(att.id)}
+                                className="rounded-md p-1 text-rose-500 hover:bg-rose-100 dark:hover:bg-rose-950/40"
+                                title={t.hostGroupDetail.receiptsDelete}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -891,6 +1184,181 @@ export default function GroupDetailPage({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Quick-pay */}
+      {showQuickPayModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl border border-zinc-200 bg-white p-6 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="flex items-center justify-between pb-4 border-b border-zinc-200 dark:border-zinc-800">
+              <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-50">
+                {t.hostGroupDetail.quickPayModalTitle}
+              </h3>
+              <button
+                onClick={() => setShowQuickPayModal(false)}
+                className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleQuickPay} className="mt-4 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                  {t.hostGroupDetail.quickPayMemberLabel}
+                </label>
+                <select
+                  value={quickPayMemberId ?? ""}
+                  onChange={(e) => assignQuickPayMember(Number(e.target.value))}
+                  className="mt-1 w-full rounded-xl border border-zinc-200 bg-zinc-50/50 py-2.5 px-3.5 text-sm text-zinc-900 outline-none focus:border-emerald-500 dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-100"
+                >
+                  {debtByMember.map((m) => (
+                    <option key={m.memberProfileId} value={m.memberProfileId}>
+                      {shares.find((s) => s.memberProfileId === m.memberProfileId)?.memberName ??
+                        `#${m.memberProfileId}`}
+                      {" — "}
+                      {t.hostGroupDetail.quickPayMemberTotal(
+                        m.obligationCount,
+                        formatMoney(m.totalRemaining, m.currency)
+                      )}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                  {t.hostGroupDetail.quickPayAmountLabel}
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  value={quickPayAmountMinor}
+                  onChange={(e) => setQuickPayAmountMinor(Number(e.target.value))}
+                  className="mt-1 w-full rounded-xl border border-zinc-200 bg-zinc-50/50 py-2.5 px-3.5 text-sm text-zinc-900 outline-none focus:border-emerald-500 dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-100"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                  {t.hostGroupDetail.paymentMethodLabel}
+                </label>
+                <select
+                  value={quickPayMethod}
+                  onChange={(e) => setQuickPayMethod(e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-zinc-200 bg-zinc-50/50 py-2.5 px-3.5 text-sm text-zinc-900 outline-none focus:border-emerald-500 dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-100"
+                >
+                  <option value="CASH">{t.hostGroupDetail.methodCash}</option>
+                  <option value="BANK_TRANSFER">{t.hostGroupDetail.methodBank}</option>
+                  <option value="OTHER">{t.hostGroupDetail.methodOther}</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                  {t.hostGroupDetail.quickPayNoteLabel}
+                </label>
+                <input
+                  type="text"
+                  value={quickPayNote}
+                  onChange={(e) => setQuickPayNote(e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-zinc-200 bg-zinc-50/50 py-2.5 px-3.5 text-sm text-zinc-900 outline-none focus:border-emerald-500 dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-100"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                  {t.hostGroupDetail.quickPayReceiptLabel}
+                </label>
+                <input
+                  type="file"
+                  accept="image/*,application/pdf"
+                  onChange={(e) => setQuickPayReceipt(e.target.files?.[0] ?? null)}
+                  className="mt-1 w-full rounded-xl border border-zinc-200 bg-zinc-50/50 py-2 px-3.5 text-sm text-zinc-700 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-600 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-emerald-500 dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-300"
+                />
+              </div>
+
+              <p className="rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+                {t.hostGroupDetail.quickPayAllocatesHint}
+              </p>
+
+              <div className="flex items-center justify-end gap-3 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowQuickPayModal(false)}
+                  className="rounded-xl px-4 py-2 text-xs font-semibold text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                >
+                  {t.hostGroupDetail.cancelBtn}
+                </button>
+                <button
+                  type="submit"
+                  disabled={quickPaying || !quickPayMemberId || quickPayAmountMinor <= 0}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {quickPaying && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  {t.hostGroupDetail.quickPaySubmitBtn}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: KHQR */}
+      {qrDebt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-3xl border border-zinc-200 bg-white p-6 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="flex items-center justify-between pb-4 border-b border-zinc-200 dark:border-zinc-800">
+              <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-50">
+                {t.hostGroupDetail.qrModalTitle}
+              </h3>
+              <button
+                onClick={closeQr}
+                className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="mt-5 flex flex-col items-center space-y-4">
+              {qrLoading ? (
+                <Loader2 className="h-14 w-14 animate-spin text-zinc-400" />
+              ) : qrError ? (
+                <p className="text-sm font-medium text-red-600 dark:text-red-400">{qrError}</p>
+              ) : qrImageUrl ? (
+                <Image
+                  src={qrImageUrl}
+                  alt={t.hostGroupDetail.qrModalTitle}
+                  width={256}
+                  height={256}
+                  unoptimized
+                  className="h-64 w-64 rounded-xl border border-zinc-200 bg-white p-2 dark:border-zinc-800"
+                />
+              ) : null}
+              <p className="text-center text-xs text-zinc-500 dark:text-zinc-400">
+                {t.hostGroupDetail.qrModalDesc}
+              </p>
+              <div className="w-full space-y-1.5 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-zinc-500">{t.hostGroupDetail.qrModalCycle}</span>
+                  <span className="font-bold">{t.hostGroupDetail.cycleNoBadge(qrDebt.cycleNo)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-500">{t.hostGroupDetail.qrModalAmount}</span>
+                  <span className="font-bold text-emerald-600">
+                    {formatMoney(qrDebt.remainingMinor, qrDebt.currency)}
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={closeQr}
+                className="w-full rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-500 cursor-pointer"
+              >
+                {t.hostGroupDetail.closeBtn}
+              </button>
+            </div>
           </div>
         </div>
       )}

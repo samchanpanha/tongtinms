@@ -35,7 +35,8 @@ public record MemberStatementResponse(
             Instant dueAt,
             Money allocated,
             Money remaining,
-            Money runningBalance) {
+            Money runningBalance,
+            String khqr) {
     }
 
     public record Total(

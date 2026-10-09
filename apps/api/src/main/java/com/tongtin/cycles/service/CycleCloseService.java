@@ -19,6 +19,8 @@ import com.tongtin.ledger.engine.FormulaException;
 import com.tongtin.ledger.service.LedgerService;
 import com.tongtin.identity.service.AuditService;
 import com.tongtin.notify.service.NotificationService;
+import com.tongtin.telegram.TelegramMessages;
+import com.tongtin.telegram.TelegramNotifier;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -46,6 +48,7 @@ public class CycleCloseService {
     private final BidRepository bidRepository;
     private final LedgerService ledgerService;
     private final NotificationService notificationService;
+    private final TelegramNotifier telegramNotifier;
     private final AuditService auditService;
 
     public CycleCloseService(CycleRepository cycleRepository,
@@ -54,6 +57,7 @@ public class CycleCloseService {
                              BidRepository bidRepository,
                              LedgerService ledgerService,
                              NotificationService notificationService,
+                             TelegramNotifier telegramNotifier,
                              AuditService auditService) {
         this.cycleRepository = cycleRepository;
         this.groupRepository = groupRepository;
@@ -61,6 +65,7 @@ public class CycleCloseService {
         this.bidRepository = bidRepository;
         this.ledgerService = ledgerService;
         this.notificationService = notificationService;
+        this.telegramNotifier = telegramNotifier;
         this.auditService = auditService;
     }
 
@@ -142,6 +147,9 @@ public class CycleCloseService {
                 "Cong bo ket qua ky " + cycle.getCycleNo(),
                 String.format("Ky %d cua hoi \"%s\" da chot; tien ke %d d.",
                         cycle.getCycleNo(), group.getName(), result.netPayout()));
+        telegramNotifier.notifyGroupOwner(group, "WINNER_PUBLISHED",
+                TelegramMessages.winnerPublished(group, cycle.getCycleNo(),
+                        winner.getShareNo(), winningBid, result.netPayout()));
         auditService.record(userId, "Cycle", cycle.getId(), "CYCLE_SETTLED",
                 Map.of("cycleNo", cycle.getCycleNo(),
                         "winnerShareId", winner.getId(),
@@ -166,6 +174,8 @@ public class CycleCloseService {
         cycle.setStatus("SETTLED");
         cycleRepository.save(cycle);
         ledgerService.markCyclePayoutPaid(cycle.getId());
+        telegramNotifier.notifyGroupOwner(group, "PAYOUT_CONFIRMED",
+                TelegramMessages.payoutConfirmed(group, cycle.getCycleNo(), cycle.getNetPayout()));
 
         if (cycle.getWinnerShareId() != null) {
             shareRepository.findById(cycle.getWinnerShareId())
@@ -184,6 +194,8 @@ public class CycleCloseService {
                     "Hoi hoan tat",
                     String.format("Hoi \"%s\" da hoan tat sau %d ky.",
                             group.getName(), group.getCycleCount()));
+            telegramNotifier.notifyGroupOwner(group, "GROUP_COMPLETED",
+                    TelegramMessages.groupCompleted(group, group.getCycleCount()));
         }
         auditService.record(userId, "Cycle", cycle.getId(), "PAYOUT_CONFIRMED",
                 Map.of("cycleNo", cycle.getCycleNo(), "netPayout", cycle.getNetPayout()));

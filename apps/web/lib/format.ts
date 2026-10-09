@@ -75,6 +75,12 @@ export function formatPhone(phone: string | null | undefined): string {
   return p;
 }
 
+export function formatBytes(bytes: number): string {
+  if (!bytes || bytes < 1024) return `${bytes || 0} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export function getGroupTypeLabel(type: string | null | undefined, lang?: Language): string {
   const t = getTranslations(lang || getStoredLanguage());
   switch (type) {

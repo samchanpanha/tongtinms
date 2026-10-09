@@ -1,5 +1,7 @@
 package com.tongtin.members.service;
 
+import com.tongtin.attachments.dto.AttachmentResponse;
+import com.tongtin.attachments.service.AttachmentService;
 import com.tongtin.common.errors.BadRequestException;
 import com.tongtin.common.errors.ConflictException;
 import com.tongtin.common.errors.NotFoundException;
@@ -15,6 +17,7 @@ import com.tongtin.identity.repository.UserRoleRepository;
 import com.tongtin.members.dto.MemberCreateRequest;
 import com.tongtin.members.dto.MemberPatchRequest;
 import com.tongtin.members.dto.MemberResponse;
+import com.tongtin.members.blacklist.service.BlacklistService;
 import com.tongtin.members.entity.MemberProfile;
 import com.tongtin.members.repository.MemberProfileRepository;
 import com.tongtin.notify.service.NotificationService;
@@ -22,6 +25,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -40,6 +44,8 @@ public class MemberService {
     private final AuditEventRepository auditEventRepository;
     private final PasswordEncoder passwordEncoder;
     private final NotificationService notificationService;
+    private final AttachmentService attachmentService;
+    private final BlacklistService blacklistService;
 
     public MemberService(MemberProfileRepository memberProfileRepository,
                          UserRepository userRepository,
@@ -47,7 +53,9 @@ public class MemberService {
                          OwnerAccountRepository ownerAccountRepository,
                          AuditEventRepository auditEventRepository,
                          PasswordEncoder passwordEncoder,
-                         NotificationService notificationService) {
+                         NotificationService notificationService,
+                         AttachmentService attachmentService,
+                         BlacklistService blacklistService) {
         this.memberProfileRepository = memberProfileRepository;
         this.userRepository = userRepository;
         this.userRoleRepository = userRoleRepository;
@@ -55,11 +63,16 @@ public class MemberService {
         this.auditEventRepository = auditEventRepository;
         this.passwordEncoder = passwordEncoder;
         this.notificationService = notificationService;
+        this.attachmentService = attachmentService;
+        this.blacklistService = blacklistService;
     }
 
     @Transactional
     public MemberResponse create(Long ownerId, MemberCreateRequest request) {
         String phone = PhoneUtil.normalize(request.phone());
+        blacklistService.activeReason(ownerId, phone).ifPresent(reason -> {
+            throw new ConflictException("This phone is blacklisted: " + reason);
+        });
         if (memberProfileRepository.existsByOwnerIdAndPhone(ownerId, phone)) {
             throw new ConflictException("member phone already exists for this owner");
         }
@@ -85,12 +98,20 @@ public class MemberService {
         List<MemberProfile> members = (q == null || q.isBlank())
                 ? memberProfileRepository.findByOwnerIdOrderByFullNameAsc(ownerId)
                 : memberProfileRepository.searchByOwner(ownerId, q.trim());
-        return members.stream().map(MemberResponse::from).toList();
+        List<Long> ids = members.stream().map(MemberProfile::getId).toList();
+        Map<Long, List<AttachmentResponse>> attachmentsByMember =
+                attachmentService.metadataForMany(ownerId, AttachmentService.TYPE_MEMBER, ids);
+        return members.stream()
+                .map(member -> MemberResponse.from(member,
+                        attachmentsByMember.getOrDefault(member.getId(), List.of())))
+                .toList();
     }
 
     @Transactional(readOnly = true)
     public MemberResponse get(Long ownerId, Long memberId) {
-        return MemberResponse.from(requireOwned(ownerId, memberId));
+        MemberProfile member = requireOwned(ownerId, memberId);
+        return MemberResponse.from(member,
+                attachmentService.metadataFor(ownerId, AttachmentService.TYPE_MEMBER, memberId));
     }
 
     @Transactional
@@ -119,14 +140,18 @@ public class MemberService {
         } catch (DataIntegrityViolationException ex) {
             throw new ConflictException("member phone already exists for this owner");
         }
-        return MemberResponse.from(member);
+        syncLoginStatus(member);
+        return MemberResponse.from(member,
+                attachmentService.metadataFor(ownerId, AttachmentService.TYPE_MEMBER, memberId));
     }
 
     @Transactional
     public MemberResponse deactivate(Long ownerId, Long memberId) {
         MemberProfile member = requireOwned(ownerId, memberId);
         member.setStatus("INACTIVE");
-        return MemberResponse.from(memberProfileRepository.save(member));
+        MemberProfile saved = memberProfileRepository.save(member);
+        return MemberResponse.from(saved,
+                attachmentService.metadataFor(ownerId, AttachmentService.TYPE_MEMBER, memberId));
     }
 
     /**
@@ -138,6 +163,9 @@ public class MemberService {
     @Transactional
     public Map<String, Object> setLogin(Long ownerId, Long memberId, String password) {
         MemberProfile member = requireOwned(ownerId, memberId);
+        if ("BLOCKED".equals(member.getStatus())) {
+            throw new ConflictException("member is blocked; unblock before setting a login");
+        }
         if (password.equals(member.getPhone())) {
             throw new BadRequestException("password must not equal phone");
         }
@@ -178,6 +206,26 @@ public class MemberService {
                 "Cap quyen dang nhap",
                 "Host da tao tai khoan dang nhap cho ban; hay dat mat khau moi.");
         return Map.of("memberId", member.getId(), "phone", member.getPhone(), "loginEnabled", true, "reset", false);
+    }
+
+    /**
+     * BLOCKED members can never hold an active login; every other status keeps the
+     * linked MEMBER account ACTIVE. HOST accounts that share the phone are untouched.
+     */
+    private void syncLoginStatus(MemberProfile member) {
+        User user = userRepository.findByPhone(member.getPhone()).orElse(null);
+        if (user == null) {
+            return;
+        }
+        List<String> roles = userRoleRepository.findRolesByUserId(user.getId());
+        if (roles.contains("HOST") || !roles.contains("MEMBER")) {
+            return;
+        }
+        String target = "BLOCKED".equals(member.getStatus()) ? "BLOCKED" : "ACTIVE";
+        if (!target.equals(user.getStatus())) {
+            user.setStatus(target);
+            userRepository.save(user);
+        }
     }
 
     private void auditLogin(Long ownerId, MemberProfile member, String action) {

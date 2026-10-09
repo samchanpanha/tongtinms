@@ -151,8 +151,25 @@ session. The live tracker is `docs/monkey_ai/STATUS.md` (current step) and the r
 | 28 | ✅ | Hermetic tests (Testcontainers) + ReleaseGateTests (no `float`/`double` in main source) |
 | 29 | ✅ | Late fees delivery — fee collection, auto settlement, payment queuing, ledger/statement display, Flyway V14 |
 | 30 | ✅ | CSV / Excel exports — ledger, host profit, member statement via Apache POI (`com.tongtin.reports.export`) |
-| 31 | ⟳ | Wrap-up & cleanup — stale docs (README/index/architecture/roadmap), Docker compose click-through, final suite + build (this session) |
+| 31 | ✅ | Wrap-up & cleanup — stale docs (README/index/architecture/roadmap), Docker compose click-through, final suite + build (recorded: suite 184, `npm run build` 13/13, all 3 containers healthy) |
 
 Parked P-items are unchanged and remain parked unless the user asks. §7.5 formula
 reminders (ranks 6–7) are recorded in `plan.md` and **need explicit user confirmation**
 before any change is made.
+
+## Phase 2 track — Steps 32–37 (executed 2026-10-09)
+
+Approved Phase 2 (hardened payments & owner tools) was executed one step per session on top of
+the completed track A+B. Live tracker: `docs/monkey_ai/STATUS.md` (current step) and root
+`plan.md` (status rows + §21–§26 records).
+
+| Step | Done | What shipped |
+|:---:|:---:|---|
+| 32 | ✅ | Attachments (receipts on payments + member docs) — V15 `attachments` BYTEA, `com.tongtin.attachments` HOST upload/stream/delete, `GET /groups/{id}/payments` history, storage settings, host+member UI |
+| 33 | ✅ | Blacklist + enforced member status — V16 `member_blacklists` (owner-local), BLOCKED→no login, INACTIVE/BLOCKED→no bid, host manager API + UI |
+| 34 | ✅ | KHQR per obligation — real EMVCo CRC16-CCITT (`TONGTIN <code>-O<entryId>`), `com.tongtin.khqr` + zxing render, `khqr` on debts + statement, QR modals |
+| 35 | ✅ | Telegram per-host chat + events + daily due-digest — V17 `telegram_chat_id`, `com.tongtin.telegram` (mock-seam client, best-effort notifier), six event hooks, `/host/telegram` |
+| 36 | ✅ | Quick-pay single-step settlement — `POST /groups/{id}/quick-pay`, auto-allocate oldest-first incl. LATE_FEE via shared `recordCore`, idempotency replay, host modal |
+| 37 | ✅ | Wrap-up & close-out — full docs pass (README ×2, plan.md, STATUS, this roadmap), final suite `mvn package` 224/0, `npm run build` 14/14, Docker compose click-through (all healthy) |
+
+Phase 2 complete — Steps 00–37 all done (suite **224**, web clean, stack green, nothing committed).

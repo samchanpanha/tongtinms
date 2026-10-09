@@ -20,6 +20,7 @@ public final class SettingsCatalog {
     public static final String SUBSCRIPTION = "SUBSCRIPTION";
     public static final String GROUPS = "GROUPS";
     public static final String SECURITY = "SECURITY";
+    public static final String TELEGRAM = "TELEGRAM";
 
     private static final List<Category> CATEGORIES = List.of(
             new Category(PAYMENT, "Cổng thanh toán (ABA PayWay)", List.of(
@@ -37,7 +38,9 @@ public final class SettingsCatalog {
                     SettingDefinition.of("payway_sandbox_mode", PAYMENT, "Chế độ Sandbox",
                             "Bật để dùng môi trường thử nghiệm, không trừ tiền thật", SettingType.BOOLEAN, "true"),
                     SettingDefinition.of("payway_enabled", PAYMENT, "Bật cổng PayWay",
-                            "Tắt để tạm dừng thanh toán trực tuyến", SettingType.BOOLEAN, "true"))),
+                            "Tắt để tạm dừng thanh toán trực tuyến", SettingType.BOOLEAN, "true"),
+                    SettingDefinition.of("payments_khqr_enabled", PAYMENT, "Bật mã QR nghĩa vụ",
+                            "Bật để mỗi khoản còn nợ có mã KHQR thanh toán (debts + statement)", SettingType.BOOLEAN, "true"))),
             new Category(SUBSCRIPTION, "Gói sử dụng", List.of(
                     SettingDefinition.of("enforce_subscription", SUBSCRIPTION, "Bắt buộc gói",
                             "Bật để chặn tạo dây hụi mới khi gói hết hạn", SettingType.BOOLEAN, "true"),
@@ -67,7 +70,28 @@ public final class SettingsCatalog {
                             "Số lần đăng nhập tối đa từ một IP trong 15 phút", "30", 1, 1000),
                     SettingDefinition.numeric("rate_limit_payway_callback_per_minute", SECURITY,
                             "Giới hạn callback PayWay mỗi phút",
-                            "Số lần webhook callback PayWay tối đa từ một IP trong một phút", "60", 1, 1000))));
+                            "Số lần webhook callback PayWay tối đa từ một IP trong một phút", "60", 1, 1000),
+                    SettingDefinition.numeric("storage_attachment_max_mb", SECURITY,
+                            "Kích thước tệp đính kèm tối đa (MB)",
+                            "Giới hạn kích thước mỗi tệp đính kèm (ảnh, PDF, bảng tính)", "10", 1, 50),
+                    SettingDefinition.of("storage_attachment_allowed_types", SECURITY,
+                            "Loại tệp đính kèm được phép",
+                            "Danh sách Content-Type hợp lệ, cách nhau bởi dấu phẩy", SettingType.STRING,
+                            "image/png,image/jpeg,image/gif,image/webp,application/pdf,"
+                                    + "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,"
+                                    + "application/vnd.ms-excel,text/csv"))),
+            new Category(TELEGRAM, "Thông báo Telegram", List.of(
+                    SettingDefinition.of("telegram_bot_token", TELEGRAM, "Bot Token",
+                            "Token bot Telegram do @BotFather cấp; để trống = tắt toàn bộ Telegram",
+                            SettingType.SECRET, ""),
+                    SettingDefinition.of("telegram_events_enabled", TELEGRAM, "Bật sự kiện Telegram",
+                            "Bật để gửi thông báo sự kiện (mở kỳ, chốt kỳ, ghi nhận tiền…) cho chủ hụi",
+                            SettingType.BOOLEAN, "true"),
+                    SettingDefinition.of("telegram_daily_digest_enabled", TELEGRAM, "Bật báo cáo thu hàng ngày",
+                            "Bật để mỗi sáng gửi tổng hợp khoản còn nợ cho chủ hụi qua Telegram",
+                            SettingType.BOOLEAN, "false"),
+                    SettingDefinition.of("telegram_daily_digest_time", TELEGRAM, "Giờ gửi báo cáo hàng ngày",
+                            "Giờ gửi dạng HH:mm (múi giờ máy chủ)", SettingType.STRING, "08:00"))));
 
     private static final Map<String, SettingDefinition> BY_KEY = indexByKey();
 

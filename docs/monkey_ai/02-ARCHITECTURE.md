@@ -49,6 +49,7 @@ com.tongtin
   dashboard     host KPI dashboard
   reports       ledger / host profit / member statement + CSV & XLSX export (reports/export)
   notify        in-app notifications
+  telegram      per-host Telegram chat (posts events + daily due-digest; Step 35)
   memberportal  member portal (member-facing `/api/v1/me/...`)
   subscription  plans, orders, ABA PayWay, lifecycle job
   settings      system_settings entity, catalog registry, typed reads
@@ -83,10 +84,13 @@ currencies
 
 owner_accounts
   id, user_id unique, display_name, status, default_currency CHAR(3) default VND,
-  cccd, bank_name, bank_account, account_holder, zalo, city, created_at
+  cccd, bank_name, bank_account, account_holder, zalo, city, created_at,
+  telegram_chat_id BIGINT NULL (V17, Step 35 — host's Telegram chat id)
 
 member_profiles
-  id, user_id nullable, owner_id, full_name, phone, note, created_at
+  id, owner_id, full_name, phone, note,
+  status (ACTIVE | INACTIVE | BLOCKED), created_at, updated_at
+  identity for member portal is by phone across owners (no user_id column)
 
 groups
   id, owner_id, code, name, type, base_amount, share_count,
@@ -145,6 +149,20 @@ payment_events (V12, Step 25 — append-only payment forensics)
   Insert-only by design (repository exposes no update/delete);
   survives callback failures because each record() commits outside
   the verify transaction when no transaction is active.
+
+attachments (V15, Step 32 — file documents BYTEA)
+  id BIGSERIAL PK, owner_id FK owner_accounts (tenant),
+  entity_type TEXT CHECK ('PAYMENT' | 'MEMBER'), entity_id BIGINT,
+  original_name TEXT, content_type TEXT, size_bytes BIGINT,
+  content BYTEA NOT NULL, uploaded_by_user_id FK users nullable,
+  uploaded_at TIMESTAMPTZ DEFAULT now()
+
+member_blacklists (V16, Step 33 — owner-local phone denylist)
+  id BIGSERIAL PK, owner_id FK owner_accounts (tenant),
+  phone TEXT NOT NULL, reason TEXT, active BOOLEAN NOT NULL DEFAULT true,
+  created_by_user_id BIGINT FK users nullable,
+  created_at TIMESTAMPTZ DEFAULT now(), updated_at TIMESTAMPTZ
+  one row per (owner_id, phone); unlist sets active = false, never deletes
 ```
 
 Indexes:
@@ -164,6 +182,10 @@ Indexes:
 - ledger_entries (cycle_id, share_id) WHERE type = 'LATE_FEE' — V14, Step 29;
   speeds up the "already charged" delta sum during late-fee assessment
   (groups.late_fee_type / late_fee_value themselves existed since V3)
+- attachments (owner_id, entity_type, entity_id) — V15, Step 32; serves the
+  per-entity attachment listing (receipts per payment, docs per member)
+- member_blacklists (owner_id, phone) unique + (owner_id, active) — V16, Step 33;
+  serves the "is this phone blacklisted for this owner" guard and the manager list
 
 ## 5. API outline
 
@@ -183,6 +205,21 @@ Host members (added Step 04):
 - GET  `/members/{id}`
 - PATCH `/members/{id}`      update name/phone/note/status
 - DELETE `/members/{id}`     soft deactivate (status INACTIVE; history kept)
+
+Blacklist (Step 33 — owner-local, per `06-SETTINGS-TEMPLATES-RISK.md` §4):
+- GET  `/members/blacklist`            list entries (active + unlisted) newest first
+- POST `/members/blacklist`            {phone, reason?} add/relink; reactivates an
+  unlisted phone; a duplicate ACTIVE phone is 409; audit BLACKLIST_ADDED
+- DELETE `/members/blacklist/{id}`     unlist (sets active=false; row kept); audit
+  BLACKLIST_REMOVED; 404 if not owned
+  Enforcement (same step):
+  - POST /members and POST /groups/{id}/shares reject a phone on the owner's ACTIVE
+    blacklist with 409 (reason included); shares only for ACTIVE members
+  - member status drives identity: BLOCKED -> linked `users.status='BLOCKED'`
+    (login refused by existing AuthService status check) and set-login refused;
+    reactivating to ACTIVE restores `users.status='ACTIVE'`
+  - INACTIVE/BLOCKED member -> no bid on any of their shares (host + member portal);
+    400 "Member is not active" (debt-QR suppression lands with Step 34 KHQR)
 
 Host groups:
 - POST `/groups`
@@ -212,6 +249,51 @@ Payments:
   `{assessed, created, entries[]}` (entry = ledgerEntryId, cycleId, shareId,
   amountMinor, currency, dueAt). Idempotent: same-day re-run creates nothing;
   `lateFeeType = NONE` → `{0, 0, []}`. GET stays read-only (assessment is explicit).
+
+Quick-pay (Step 36, decision 2026-10-09):
+- POST `/groups/{id}/quick-pay` (HOST only, own group; optional `Idempotency-Key`
+  header, same semantics/limits as `/payments`) — single-step settlement for ONE
+  member: the host types a total and the backend auto-allocates it across that
+  member's outstanding obligations (UNPAID/PARTIAL, `direction = 'IN'`, incl.
+  LATE_FEE rows by default), saving a normal `payments` row. Response is the
+  standard `PaymentResponse` (same shape as POST /payments).
+- Request `{memberProfileId, amountMinor, currency, method?, paidAt?, note?,
+  allocateLateFees?}` — `allocateLateFees` (boolean, default `true`) includes
+  LATE_FEE obligations in the auto-allocation pool; method defaults to `CASH`.
+- Auto-allocation order (locked): `ORDER BY due_at ASC, id ASC` — **oldest due
+  first, tie-broken by lower entry id** (plan §20). Each obligation receives
+  `min(remaining, leftover)`; allocations always sum exactly to `amountMinor`.
+- Errors: member has no share in this group → 404; member has no outstanding
+  obligations → 400; `amountMinor` exceeds the member's total remaining → 400.
+- Internals: quick-pay builds the allocation list then calls the SAME core path
+  as POST /payments (`PaymentService` — the shared `recordAllocated` core), so
+  locking, idempotency replay, notification, Telegram PAYMENT_RECORDED ping,
+  attachments metadata and audit are all identical. Audit row for a quick-pay
+  marks `autoAllocated: true`.
+- Receipt attach is NOT inside this JSON call: it uses the existing
+  `POST /payments/{paymentId}/attachments` right after (same host flow).
+
+Obligation KHQR (Step 34) — decision 2026-10-09:
+- Every still-owing obligation (`debts` rows and member `statement` entries whose
+  `remaining > 0`) carries a deterministic `khqr` payload string when the
+  `payments_khqr_enabled` PAYMENT setting is true (when disabled the field is
+  omitted — the JSON shape lacks it). Display/MONEY are separate concerns: the QR
+  is a convenience for a manual bank transfer only; the codebase never reads
+  money from a QR.
+- Format is a genuine EMVCo merchant-presented QR: `000201` payload format,
+  dynamic `010212`, merchant account info, `53` numeric currency, `54` amount
+  (major-unit decimal from `exponent`, pure long math — zero float), `58`=KH,
+  `59` merchant name, `60` city, `62/01` bill number ref
+  `TONGTIN <groupCode>-O<ledgerEntryId>`, and `63 04` = real CRC16-CCITT
+  (poly 0x1021, init 0xFFFF) over the payload. Pure Java generator
+  `com.tongtin.khqr.KhqrGenerator` (no Spring, no DB — like the formula engine).
+- New PAYMENT catalog key `payments_khqr_enabled` (BOOLEAN, default true),
+  honored live at read time (no migration).
+- Render: `GET /api/v1/obligations/{ledgerEntryId}/khqr` → `image/png`
+  (zxing). HOST may render any obligation of own group; MEMBER may render own
+  share's obligation; cross-owner/cross-member → 404; anonymous → 401. Renders
+  only when the setting is enabled (else 404). Subscription KHQR string (Step 19)
+  is UNTOUCHED.
 
 Host dashboard (Step 12):
 - GET `/host/dashboard`   owner-scoped summary: my groups (id, code, name, type, status,
@@ -296,11 +378,12 @@ counters and dates stay scalars). New module `com.tongtin.reports` (+ reusable
   shares only, 404 if not a member): { groupId, groupName, currency, shares[],
   totals }. Each share: shareId, shareNo, status, entries[] (entryId, cycleNo,
   type, direction, shareNo, amount, status, dueAt, allocated, remaining,
-  runningBalance — money) sorted (cycleNo, entryId) with runningPosition added
-  after each line, and totals {contributed, received, feesPaid, netPosition}
-  using the 01-DOMAIN §9.5 definitions; totals across the member's shares as
-  well. runningBalance: money actually moved — contributions/fees subtract
-  allocated, payouts add full amount.
+  runningBalance — money, and `khqr` (Step 34) present only when the entry still
+  owes (`remaining > 0`) AND `payments_khqr_enabled`) sorted (cycleNo, entryId)
+  with runningPosition added after each line, and totals {contributed, received,
+  feesPaid, netPosition}) using the 01-DOMAIN §9.5 definitions; totals across
+  the member's shares as well. runningBalance: money actually moved —
+  contributions/fees subtract allocated, payouts add full amount.
 - MEMBER GET /me/groups/{id}/cycles -> public cycle summaries (01-DOMAIN §14;
   host fee and host profit are HOST-ONLY and must NOT appear): each cycle {
   cycleNo, status, openAt, bidCloseAt, dueAt, winner { shareNo, memberName },
@@ -468,7 +551,8 @@ controlled from the admin UI. Package `com.tongtin.settings`, backed by the
     blank SECRET = keep existing). Writes audit event `ADMIN_UPDATE_SETTINGS`
     with `changedKeys`, returns the fresh grouped view.
 - Runtime effect (values are read at use time, no restart):
-  - PAYMENT: PayWay merchant/api key/urls/sandbox/enabled
+  - PAYMENT: PayWay merchant/api key/urls/sandbox/enabled,
+    `payments_khqr_enabled` (Step 34 obligation QR toggle)
   - SUBSCRIPTION: `enforce_subscription`, `free_trial_days` (trial length at
     owner registration), `grace_period_days`, `subscription_reminder_days`,
     `checkout_pending_reuse_minutes` (Step 26 order-reuse window)
@@ -530,6 +614,89 @@ XlsxRenderer + ExportService); `org.apache.poi:poi-ooxml` added to pom.xml.
   fetch-with-token -> Blob -> anchor click (the API requires a Bearer token,
   so plain links cannot work).
 
+### Attachments (Step 32)
+
+Scope: HOST-only upload. Files (images / PDF / Excel / CSV) attach to either
+a **PAYMENT** (receipt) or a **MEMBER** profile (contract / CCCD). Stored as
+BYTEA in `attachments.content` — no filesystem, no path traversal surface,
+per-tenant isolation by `owner_id` on every query. Sizes and allowed types are
+governed by SECURITY settings (`storage_attachment_max_mb`, default 10,
+1–50; `storage_attachment_allowed_types`, comma list default
+`image/png,image/jpeg,image/gif,image/webp,application/pdf,
+application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,
+application/vnd.ms-excel,text/csv`) — no Flyway migration for new limits.
+
+Endpoints (all HOST-owned; cross-owner → 404, anonymous → 401):
+- `POST /api/v1/payments/{paymentId}/attachments` — multipart field `file`;
+  validates entity ownership (payment inside an owned group), type allow-list,
+  size cap (400 on empty / bad type / oversize); returns the AttachmentResponse
+- `POST /api/v1/members/{id}/attachments` — same rules, member owner-scoped
+- `GET /api/v1/attachments/{id}` — streams original bytes with stored
+  content-type; `Content-Disposition: attachment; filename*=UTF-8''…` (RFC 5987)
+- `DELETE /api/v1/attachments/{id}` — removes the row + bytes (204)
+- `GET /api/v1/groups/{id}/payments` — payment **history** (new Step 32): each
+  payment with amount/currency/method/paidAt/note, `allocations[]`, and
+  `attachments[]` metadata — the host-facing receipts list
+
+AttachmentResponse = `{id, entityType, entityId, originalName, contentType,
+sizeBytes, uploadedAt}`. `PaymentResponse` (record/create + history) and
+`MemberResponse` gain `attachments[]` metadata (never the bytes; bytes load
+only via GET /attachments/{id}). Member-portal reads of own receipts are
+deferred to the Step 34 statement rework; Step 32 upload is host-only.
+
+### Telegram (Step 35)
+
+Per-host Telegram chat: a host links their own Telegram **chat id**
+(`owner_accounts.telegram_chat_id`, V17) and receives a ping on their own chat
+for cycle events and (opt-in) a daily due-digest. This is host-only — members
+are NOT messaged over Telegram. Outbound traffic is the standard Bot API:
+`POST https://api.telegram.org/bot<token>/sendMessage` with JSON
+`{chat_id, text}` via `java.net.http.HttpClient` (10 s timeout), so NO new
+runtime dependency. Everything is settings-gated: with `telegram_bot_token`
+blank (admin hasn't configured a bot) every send short-circuits to a no-op —
+zero network, zero side effects. Failures are best-effort, mirroring
+`NotificationService`: a Telegram send can NEVER throw into (or roll back) a
+financial operation — outbound errors are logged and swallowed. Events are
+delivered synchronously in the same service method (documented trade-off:
+the host's chat ping is best-effort and the token is blank in tests, so no
+transaction is actually held open there).
+
+TELEGRAM settings category (admin, catalog-driven — a 5th category):
+- `telegram_bot_token` (SECRET, default `""`) — bot token from `@BotFather`;
+  blank = Telegram fully off (events + digest + test-send all short-circuit)
+- `telegram_events_enabled` (BOOLEAN, default `true`) — gate per-event pings
+- `telegram_daily_digest_enabled` (BOOLEAN, default `false`) — gate the digest job
+- `telegram_daily_digest_time` (STRING `HH:mm`, default `08:00`) — when the
+  daily due-digest runs (`0 <mm> <hh> * * *`)
+
+Host endpoints (`/api/v1/host/telegram`, `hasRole('HOST')`, cross-owner 404 for
+members/anon 401):
+- `GET  /host/telegram` → status `{chatId, linked, eventsEnabled, digestEnabled,
+  digestTime, eventsConfigured}` (`eventsConfigured` = a bot token is set)
+- `PUT  /host/telegram/chat-id` body `{"chatId": <long>|null}` → set or clear
+  (null/blank clears); validates the chat id is a positive long; audit
+  `TELEGRAM_LINKED` / `TELEGRAM_UNLINKED`
+- `POST /host/telegram/test` → sends a test ping to the linked chat; 400 when
+  not linked or no bot token configured; audit `TELEGRAM_TEST`
+
+Events sent to the host chat (Vietnamese text, same wording style as in-app
+notifications), each after the audit write and wrapped so it never throws:
+- CYCLE_OPENED (CycleService.open) — "Ky X/Y … da mo" + bid close
+- WINNER_PUBLISHED (CycleCloseService.closeAndCalculate) — winner + payout
+- PAYOUT_CONFIRMED (CycleCloseService.confirmPayout) — amount paid out
+- GROUP_COMPLETED (last cycle payout confirmed)
+- PAYMENT_RECORDED (PaymentService.record) — amount + payer count
+- LATE_FEE_ASSESSED (LateFeeService.assess) — fee total + affected count
+
+Daily due-digest (`TelegramDigestJob.process(now)`, `@Scheduled`): runs at the
+configured `HH:mm` and, for every host with a chat id linked, sends one message
+listing each of their groups with unpaid IN obligations (UNPAID/PARTIAL,
+`dueAt < now`): group name/code, unpaid count, total remaining minor, and an
+overall "you still have N member(s) owing" line for the host. Only hosts whose
+group actually has content are messaged; the message is composed in pure code
+(`TelegramMessages`) and amounts are formatted with long-only decimal math
+(exponent-aware, same table as 07-MULTI-CURRENCY §10).
+
 ## 6. Frontend pages
 
 Host:
@@ -541,6 +708,7 @@ Host:
 - `/host/groups/[id]`
 - `/host/groups/[id]/cycle/[cycleId]`
 - `/host/groups/[id]/ledger`
+- `/host/telegram` (Step 35: link chat id + test-send)
 
 Member:
 - `/app` my groups

@@ -9,6 +9,8 @@ import com.tongtin.ledger.engine.FormulaEngine;
 import com.tongtin.ledger.entity.LedgerEntry;
 import com.tongtin.ledger.repository.LedgerEntryRepository;
 import com.tongtin.notify.service.NotificationService;
+import com.tongtin.telegram.TelegramMessages;
+import com.tongtin.telegram.TelegramNotifier;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -38,15 +40,18 @@ public class LateFeeService {
     private final LedgerEntryRepository ledgerEntryRepository;
     private final AuditService auditService;
     private final NotificationService notificationService;
+    private final TelegramNotifier telegramNotifier;
 
     public LateFeeService(GroupRepository groupRepository,
                           LedgerEntryRepository ledgerEntryRepository,
                           AuditService auditService,
-                          NotificationService notificationService) {
+                          NotificationService notificationService,
+                          TelegramNotifier telegramNotifier) {
         this.groupRepository = groupRepository;
         this.ledgerEntryRepository = ledgerEntryRepository;
         this.auditService = auditService;
         this.notificationService = notificationService;
+        this.telegramNotifier = telegramNotifier;
     }
 
     @Transactional
@@ -106,6 +111,8 @@ public class LateFeeService {
                     "Phi le tre han",
                     String.format("Hoi \"%s\" da tinh phi tre %d d cho ban.",
                             group.getName(), total));
+            telegramNotifier.notifyGroupOwner(group, "LATE_FEE_ASSESSED",
+                    TelegramMessages.lateFeesAssessed(group, total, notifiedProfiles.size()));
         }
         return new LateFeeAssessResponse(assessed, created.size(), List.copyOf(created));
     }

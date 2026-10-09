@@ -258,3 +258,27 @@ On report: join `currencies` for exponent; missing join is a bug.
 - FX: NO
 - Reports: always include currency; profit grouped by currency
 - `host_fee_value` split into `host_fee_minor` and `host_fee_bps`
+
+## 10. EMVCo/KHQR amount rendering (Step 34)
+
+EMVCo merchant-presented QRs carry the currency by its ISO 4217 **numeric**
+code and the amount as a **major-unit decimal string**. Mapping (the only place
+numeric codes live; a static `Map<String,Integer>` in the pure-Java KhqrGenerator
+— no DB column):
+
+| Code | Numeric | Exponent |
+|---|---|---|
+| VND | 704 | 0 |
+| KHR | 116 | 0 |
+| LAK | 418 | 0 |
+| USD | 840 | 2 |
+| THB | 764 | 2 |
+| SGD | 702 | 2 |
+
+Amount rule: `remaining` minor units → decimal string with exactly `exponent`
+fraction digits, zero-padded, using long math only (zero-float invariant):
+- exponent 0 → `aposLong(remaining)` (e.g. `800000`)
+- exponent 2 → `whole + "." + zero-padded fraction` (e.g. `125045` → `1250.45`)
+
+Any group currency not in the map is not QR-able (the generator throws a
+`BadRequestException`-grade error that the read paths treat as "no QR").

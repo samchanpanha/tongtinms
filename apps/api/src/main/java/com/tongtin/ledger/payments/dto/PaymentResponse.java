@@ -1,5 +1,6 @@
 package com.tongtin.ledger.payments.dto;
 
+import com.tongtin.attachments.dto.AttachmentResponse;
 import com.tongtin.ledger.payments.entity.Payment;
 import com.tongtin.ledger.payments.entity.PaymentAllocation;
 import java.time.Instant;
@@ -14,12 +15,18 @@ public record PaymentResponse(
         Instant paidAt,
         String note,
         Instant createdAt,
-        List<Allocation> allocations) {
+        List<Allocation> allocations,
+        List<AttachmentResponse> attachments) {
 
     public record Allocation(Long ledgerEntryId, long amountMinor) {
     }
 
     public static PaymentResponse from(Payment payment, List<PaymentAllocation> allocations) {
+        return from(payment, allocations, List.of());
+    }
+
+    public static PaymentResponse from(Payment payment, List<PaymentAllocation> allocations,
+                                       List<AttachmentResponse> attachments) {
         return new PaymentResponse(
                 payment.getId(),
                 payment.getGroupId(),
@@ -31,6 +38,7 @@ public record PaymentResponse(
                 payment.getCreatedAt(),
                 allocations.stream()
                         .map(a -> new Allocation(a.getLedgerEntryId(), a.getAmountMinor()))
-                        .toList());
+                        .toList(),
+                attachments == null ? List.of() : attachments);
     }
 }

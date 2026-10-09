@@ -14,6 +14,7 @@ import com.tongtin.identity.repository.UserRepository;
 import com.tongtin.ledger.entity.LedgerEntry;
 import com.tongtin.ledger.payments.repository.PaymentAllocationRepository;
 import com.tongtin.ledger.repository.LedgerEntryRepository;
+import com.tongtin.khqr.ObligationQrService;
 import com.tongtin.members.entity.MemberProfile;
 import com.tongtin.members.repository.MemberProfileRepository;
 import com.tongtin.reports.dto.MemberStatementResponse;
@@ -47,6 +48,7 @@ public class MemberReportService {
     private final LedgerEntryRepository ledgerEntryRepository;
     private final PaymentAllocationRepository allocationRepository;
     private final MoneyLookup money;
+    private final ObligationQrService obligationQrService;
 
     public MemberReportService(UserRepository userRepository,
                                MemberProfileRepository memberProfileRepository,
@@ -55,7 +57,8 @@ public class MemberReportService {
                                CycleRepository cycleRepository,
                                LedgerEntryRepository ledgerEntryRepository,
                                PaymentAllocationRepository allocationRepository,
-                               MoneyLookup money) {
+                               MoneyLookup money,
+                               ObligationQrService obligationQrService) {
         this.userRepository = userRepository;
         this.memberProfileRepository = memberProfileRepository;
         this.shareRepository = shareRepository;
@@ -64,6 +67,7 @@ public class MemberReportService {
         this.ledgerEntryRepository = ledgerEntryRepository;
         this.allocationRepository = allocationRepository;
         this.money = money;
+        this.obligationQrService = obligationQrService;
     }
 
     @Transactional(readOnly = true)
@@ -83,7 +87,7 @@ public class MemberReportService {
 
         List<MemberStatementResponse.Share> shares = myShares.stream()
                 .sorted(Comparator.comparing(GroupShare::getShareNo))
-                .map(share -> toShare(share, entries, cycleNoById, allocatedById, code))
+                .map(share -> toShare(group, share, entries, cycleNoById, allocatedById, code))
                 .toList();
 
         MemberStatementResponse.Total total = new MemberStatementResponse.Total(
@@ -117,7 +121,8 @@ public class MemberReportService {
                 .toList();
     }
 
-    private MemberStatementResponse.Share toShare(GroupShare share,
+    private MemberStatementResponse.Share toShare(Group group,
+                                                  GroupShare share,
                                                   List<LedgerEntry> entries,
                                                   Map<Long, Integer> cycleNoById,
                                                   Map<Long, Long> allocatedById,
@@ -137,6 +142,10 @@ public class MemberReportService {
         for (LedgerEntry e : shareEntries) {
             long allocated = allocatedById.getOrDefault(e.getId(), 0L);
             long remaining = Math.max(0, e.getAmountMinor() - allocated);
+            String khqr = remaining > 0 && "IN".equals(e.getDirection())
+                    ? obligationQrService.payload(group.getCode(), e.getId(),
+                            group.getName(), remaining, code)
+                    : null;
             long delta;
             if ("OUT".equals(e.getDirection())) {
                 delta = e.getAmountMinor();
@@ -161,7 +170,8 @@ public class MemberReportService {
                     e.getDueAt(),
                     money.money(code, allocated),
                     money.money(code, remaining),
-                    money.money(code, running)));
+                    money.money(code, running),
+                    khqr));
         }
 
         long netPosition = received - contributed - feesPaid;

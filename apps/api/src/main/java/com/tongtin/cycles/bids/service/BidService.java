@@ -15,6 +15,8 @@ import com.tongtin.groups.repository.GroupRepository;
 import com.tongtin.groups.shares.entity.GroupShare;
 import com.tongtin.groups.shares.repository.GroupShareRepository;
 import com.tongtin.identity.service.AuditService;
+import com.tongtin.members.entity.MemberProfile;
+import com.tongtin.members.repository.MemberProfileRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -31,17 +33,20 @@ public class BidService {
     private final GroupRepository groupRepository;
     private final GroupShareRepository shareRepository;
     private final AuditService auditService;
+    private final MemberProfileRepository memberProfileRepository;
 
     public BidService(BidRepository bidRepository,
                       CycleRepository cycleRepository,
                       GroupRepository groupRepository,
                       GroupShareRepository shareRepository,
-                      AuditService auditService) {
+                      AuditService auditService,
+                      MemberProfileRepository memberProfileRepository) {
         this.bidRepository = bidRepository;
         this.cycleRepository = cycleRepository;
         this.groupRepository = groupRepository;
         this.shareRepository = shareRepository;
         this.auditService = auditService;
+        this.memberProfileRepository = memberProfileRepository;
     }
 
     @Transactional
@@ -69,6 +74,12 @@ public class BidService {
 
         if (!"ALIVE".equals(share.getStatus())) {
             throw new BadRequestException("Only ALIVE shares may bid, share is " + share.getStatus());
+        }
+
+        MemberProfile member = memberProfileRepository.findById(share.getMemberProfileId())
+                .orElse(null);
+        if (member != null && !"ACTIVE".equals(member.getStatus())) {
+            throw new BadRequestException("Member is not active: " + member.getStatus());
         }
 
         long bid = request.amountMinor();

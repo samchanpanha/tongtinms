@@ -5,6 +5,7 @@ import com.tongtin.ledger.dto.LateFeeAssessResponse;
 import com.tongtin.ledger.payments.dto.DebtResponse;
 import com.tongtin.ledger.payments.dto.PaymentCreateRequest;
 import com.tongtin.ledger.payments.dto.PaymentResponse;
+import com.tongtin.ledger.payments.dto.QuickPayRequest;
 import com.tongtin.ledger.payments.service.PaymentService;
 import com.tongtin.ledger.service.LateFeeService;
 import jakarta.validation.Valid;
@@ -47,10 +48,29 @@ public class PaymentController {
                 .body(paymentService.record(principal.userId(), principal.ownerId(), id, request, idempotencyKey));
     }
 
+    @PostMapping("/groups/{id}/quick-pay")
+    public ResponseEntity<PaymentResponse> quickPay(@AuthenticationPrincipal AuthPrincipal principal,
+                                                    @PathVariable Long id,
+                                                    @Valid @RequestBody QuickPayRequest request,
+                                                    @RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey) {
+        PaymentResponse replay = paymentService.findQuickPayReplay(principal.ownerId(), id, request, idempotencyKey);
+        if (replay != null) {
+            return ResponseEntity.ok(replay);
+        }
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(paymentService.quickPay(principal.userId(), principal.ownerId(), id, request, idempotencyKey));
+    }
+
     @GetMapping("/groups/{id}/debts")
     public List<DebtResponse> debts(@AuthenticationPrincipal AuthPrincipal principal,
                                     @PathVariable Long id) {
         return paymentService.debts(principal.ownerId(), id);
+    }
+
+    @GetMapping("/groups/{id}/payments")
+    public List<PaymentResponse> payments(@AuthenticationPrincipal AuthPrincipal principal,
+                                          @PathVariable Long id) {
+        return paymentService.paymentHistory(principal.ownerId(), id);
     }
 
     @PostMapping("/groups/{id}/late-fees/assess")

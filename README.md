@@ -4,7 +4,7 @@
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.5-brightgreen.svg)](https://spring.io/projects/spring-boot)
 [![Next.js](https://img.shields.io/badge/Next.js-16.3-black.svg)](https://nextjs.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://www.postgresql.org/)
-[![Tests](https://img.shields.io/badge/Tests-184%20passed-success.svg)](#testing--verification)
+[![Tests](https://img.shields.io/badge/Tests-224%20passed-success.svg)](#testing--verification)
 [![License](https://img.shields.io/badge/License-Proprietary-lightgrey.svg)]()
 
 > **វេទិកាគ្រប់គ្រងហ៊ុយ / ហ៊ុយ (ROSCA — Rotating Savings and Credit Association) ទំនើប តម្លាភាព និងសុវត្ថិភាព** ដែលត្រូវបានរចនាត្រឹមត្រូវតាមទំនៀមទម្លាប់ហិរញ្ញវត្ថុប្រពៃណីវៀតណាម និងស្តង់ដារអន្តរជាតិ។
@@ -32,11 +32,14 @@ tongtin/
 │   │   │   ├── memberportal/    # វិបផតថលសម្រាប់សមាជិក (Member Portal)
 │   │   │   ├── subscription/    # កញ្ចប់សេវាកម្ម SaaS, រួមបញ្ចូល ABA PayWay & កំណត់ហេតុការទូទាត់
 │   │   │   ├── settings/        # ការកំណត់ប្រព័ន្ធ & កញ្ចប់ប៉ារ៉ាម៉ែត្រលំនាំដើមសម្រាប់ខ្សែហ៊ុយថ្មី
+│   │   │   ├── attachments/     # ភ្ជាប់បង្កាន់ដៃ & ឯកសារសមាជិក (BYTEA, V15)
+│   │   │   ├── khqr/            # ម៉ាស៊ីនផ្ទៀងផ្ទាត់ QR KHQR (EMVCo, zxing)
+│   │   │   ├── telegram/        # ជូនដំណឹង Telegram (chat-id per host, digest job, V17)
 │   │   │   └── demo/            # ឧបករណ៍បញ្ចូលទិន្នន័យគំរូ (Demo Fixture Seeder)
-│   │   └── src/main/resources/db/migration/  # 14 Flyway Migrations (V1 -> V14)
+│   │   └── src/main/resources/db/migration/  # 17 Flyway Migrations (V1 -> V17)
 │   │
 │   └── web/                     # Next.js 16 App Router + Tailwind CSS v4 Frontend
-│       ├── app/                 # 13 ផ្លូវ៖ ទំព័រដើម, ចូល, ចុះឈ្មោះ, host portal, member portal
+│       ├── app/                 # 14 ផ្លូវ៖ ទំព័រដើម, ចូល, ចុះឈ្មោះ, host portal, member portal
 │       ├── components/          # StatCard, StatusBadge, EmptyState, Navbar, ល។
 │       └── lib/                 # កម្មវិធីរុំ API របស់ម៉ាស៊ីនភ្ញៀវ, formatMoney (១.០០០.០០០៛), ទម្រង់កាលបរិច្ឆេទ
 │
@@ -89,7 +92,7 @@ chmod +x start.sh
 
 ស្គ្រីបនឹងធ្វើដោយស្វ័យប្រវត្តិ៖
 1. ចាប់ផ្តើម PostgreSQL 16 នៅលើច្រក `5432` ហើយរង់ចាំពិនិត្យស្ថានភាពត្រៀមរួចរាល់។
-2. អនុវត្តការផ្លាស់ប្តូរ 14 Flyway ទាំងអស់ (V1 → V14) ហើយចាប់ផ្តើម API Spring Boot នៅលើច្រក `8080`។
+2. អនុវត្តការផ្លាស់ប្តូរ 17 Flyway ទាំងអស់ (V1 → V17) ហើយចាប់ផ្តើម API Spring Boot នៅលើច្រក `8080`។
 3. បញ្ចូលសំណុំទិន្នន័យគំរូស្តង់ដារ (ខ្សែហ៊ុយ 10 វគ្គដែលមានការដាក់ដេញថ្លៃ សៀវភៅគណនេយ្យមានតុល្យភាព ថ្លៃម្ចាស់ហ៊ុយ និងការបង់ប្រាក់ពេញលេញ)។
 4. ចាប់ផ្តើមចំណុចប្រទាក់ Next.js នៅលើច្រក `3000`។
 
@@ -173,7 +176,7 @@ docker compose down
 ## 🧪 ការសាកល្បង និងការធានាគុណភាព (Testing & Verification)
 
 ### ការសាកល្បង Backend (JUnit 5 + Spring Boot Test + Testcontainers)
-ប្រព័ន្ធ backend ទាំងមូលត្រូវបានគ្របដណ្តប់ដោយ **184 ការសាកល្បងដោយស្វ័យប្រវត្តិ** រួមមានការសាកល្បងគណិតវិទ្យាគែម, ម៉ាទ្រីសបែងចែកសិទ្ធិឆ្លងកាត់ tenant, ការសាកល្បងការប្រកួតប្រជែង និងការសាកល្បងនាំចេញឯកសារ CSV/XLSX។
+ប្រព័ន្ធ backend ទាំងមូលត្រូវបានគ្របដណ្តប់ដោយ **224 ការសាកល្បងដោយស្វ័យប្រវត្តិ** រួមមានការសាកល្បងគណិតវិទ្យាគែម, ម៉ាទ្រីសបែងចែកសិទ្ធិឆ្លងកាត់ tenant, ការសាកល្បងការប្រកួតប្រជែង និងការសាកល្បងនាំចេញឯកសារ CSV/XLSX។
 
 ចាប់ពី **ជំហានទី 28 (ថ្ងៃទី 08 ខែតុលា ឆ្នាំ 2026)** សំណុំសាកល្បងដំណើរការ **hermetic** ដោយប្រើ Testcontainers៖ រាល់ពេលដែលដំណើរការ `mvn test`
 នឹងចាប់ផ្តើមកុងតឺន័រ `postgres:16` ដាច់ដោយឡែក (Flyway migrate ទាំងមូលគ្រោងការណ៍ពីដើម) —
@@ -185,7 +188,7 @@ mvn test
 ```
 ```
 [INFO] Results:
-[INFO] Tests run: 184, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 224, Failures: 0, Errors: 0, Skipped: 0
 [INFO] BUILD SUCCESS
 ```
 
@@ -195,14 +198,14 @@ mvn test
 ```bash
 cd apps/web
 npm run lint     # 0 កំហុស, 0 ការព្រមាន
-npm run build    # 13/13 ផ្លូវឋិតិវន្ត និងថាមវន្តត្រូវបានចងក្រងដោយជោគជ័យ
+npm run build    # 14/14 ផ្លូវឋិតិវន្ត និងថាមវន្តត្រូវបានចងក្រងដោយជោគជ័យ
 ```
 
 ---
 
-## 📜 វឌ្ឍនភាពនៃការអនុវត្ត 31 ជំហាន (Build Roadmap)
+## 📜 វឌ្ឍនភាពនៃការអនុវត្ត 37 ជំហាន (Build Roadmap)
 
-ប្រព័ន្ធបានបញ្ចប់ទាំងស្រុង **31/31 ជំហាន** តាមផ្លូវដំណើរការដែលបានកំណត់ (`docs/monkey_ai/STATUS.md` + `plan.md`)៖
+ប្រព័ន្ធបានបញ្ចប់ទាំងស្រុង **37/37 ជំហាន** តាមផ្លូវដំណើរការដែលបានកំណត់ (`docs/monkey_ai/STATUS.md` + `plan.md`)៖
 
 | ជំហាន | ឈ្មោះជំហាន | ខ្លឹមសារដែលបានបញ្ចប់ |
 |:---:|---|---|
@@ -238,6 +241,12 @@ npm run build    # 13/13 ផ្លូវឋិតិវន្ត និងថា
 | **29** | **Late Fees Delivery** | ប្រមូលថ្លៃផាកពិន័យយឺត, បិទសៀវភៅដោយស្វ័យប្រវត្តិ, ការតំរង់ជួរទូទាត់, បង្ហាញពេញលេញនៅលើសៀវភៅគណនេយ្យ & របាយការណ៍ (Flyway V14) |
 | **30** | **CSV / Excel Exports** | នាំចេញសៀវភៅគណនេយ្យ, របាយការណ៍ថ្លៃម្ចាស់ហ៊ុយ & របាយការណ៍សមាជិកទៅជា **CSV** និង **XLSX (Apache POI)** — ជួរឈរពេញលេញ ជួរ TOTAL, ការពារប្រឆាំងនឹងការបញ្ចូលរូបមន្ត |
 | **31** | **Wrap-up & Cleanup** | សម្អាតឯកសារហួសសម័យ (README, លិបិក្រម, ស្ថាបត្យកម្ម), ផ្ទៀងផ្ទាត់ប្រព័ន្ធទាំងមូលតាមរយៈ Docker compose, ពិនិត្យសំណុំសាកល្បង + ការចងក្រងចុងក្រោយ |
+| **32** | **Attachments (Phase 2 #1)** | ភ្ជាប់រូបភាពបង្កាន់ដៃលើការបង់លុយ & ឯកសារសមាជិក (Flyway V15 `attachments`, BYTEA), ប្រវត្តិការបង់លុយ `GET /groups/{id}/payments`, UI របស់ម្ចាស់ហ៊ុយ + សមាជិក, i18n ×4 |
+| **33** | **Blacklist + Enforced Status (Phase 2 #2)** | បញ្ជីខ្មៅតាមម្ចាស់ហ៊ុយ (Flyway V16 `member_blacklists`), BLOCKED → គ្មានការចូល, INACTIVE/BLOCKED → គ្មានការដាក់ដេញថ្លៃ, UI គ្រប់គ្រងបញ្ជីខ្មៅ, i18n ×4 |
+| **34** | **KHQR per Obligation (Phase 2 #3)** | QR KHQR EMVCo ពិតប្រាកដ (CRC16, `TONGTIN <code>-O<entryId>`) លើកាតព្វកិច្ចដែលនៅមិនទាន់បង់ (debts + statement), render PNG, i18n ×4 |
+| **35** | **Telegram Notifications (Phase 2 #4)** | ជូនដំណឹង Telegram តាមម្ចាស់ហ៊ុយ (Flyway V17 `telegram_chat_id`), ព្រឹត្តិការណ៍វដ្ត + daily due-digest, ផ្ទាំង `/host/telegram`, i18n ×4 |
+| **36** | **Quick-pay Single-Step Settlement (Phase 2 #5)** | `POST /groups/{id}/quick-pay`: អ្នកម្ចាស់ហ៊ុយវាយចំនួនសរុប ប្រព័ន្ធចែកទៅកាតព្វកិច្ចចាស់ជាងគេដោយស្វ័យប្រវត្តិ (រួមទាំង late fee) តាមរយៈ core រួមនៃ `PaymentService.record()` |
+| **37** | **Wrap-up (Phase 2 #6)** | ពិនិត្យឯកសារទាំងអស់ (README ×2, plan.md, roadmaps, STATUS), final suite `mvn package` (224), `npm run build` 14/14, Docker compose click-through (3 services healthy) |
 
 ---
 

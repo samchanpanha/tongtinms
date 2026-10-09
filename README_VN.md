@@ -4,7 +4,7 @@
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.5-brightgreen.svg)](https://spring.io/projects/spring-boot)
 [![Next.js](https://img.shields.io/badge/Next.js-16.3-black.svg)](https://nextjs.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://www.postgresql.org/)
-[![Tests](https://img.shields.io/badge/Tests-184%20passed-success.svg)](#testing--verification)
+[![Tests](https://img.shields.io/badge/Tests-224%20passed-success.svg)](#testing--verification)
 [![License](https://img.shields.io/badge/License-Proprietary-lightgrey.svg)]()
 
 > **Nền tảng quản lý Hụi / Hội (ROSCA — Rotating Savings and Credit Association) hiện đại, minh bạch và bảo mật**, thiết kế chuẩn xác theo tập quán tài chính truyền thống Việt Nam và thông lệ quốc tế.
@@ -32,11 +32,14 @@ tongtin/
 │   │   │   ├── memberportal/    # Cổng thông tin Hội Viên (Member Portal)
 │   │   │   ├── subscription/    # Gói cước SaaS, tích hợp ABA PayWay & nhật ký thanh toán
 │   │   │   ├── settings/        # Cấu hình hệ thống & gói tham số dây hụi mặc định
+│   │   │   ├── attachments/     # Đính kèm biên nhận & hồ sơ hội viên (BYTEA, V15)
+│   │   │   ├── khqr/            # Máy tạo mã QR KHQR (EMVCo, zxing)
+│   │   │   ├── telegram/        # Thông báo Telegram (chat-id per host, digest job, V17)
 │   │   │   └── demo/            # Trình nạp dữ liệu mẫu (Demo Fixture Seeder)
-│   │   └── src/main/resources/db/migration/  # 14 Flyway Migrations (V1 -> V14)
+│   │   └── src/main/resources/db/migration/  # 17 Flyway Migrations (V1 -> V17)
 │   │
 │   └── web/                     # Next.js 16 App Router + Tailwind CSS v4 Frontend
-│       ├── app/                 # 13 routes: landing, login, register, host portal, member portal
+│       ├── app/                 # 14 routes: landing, login, register, host portal, member portal
 │       ├── components/          # StatCard, StatusBadge, EmptyState, Navbar, v.v.
 │       └── lib/                 # Client API wrapper, formatMoney (1.000.000 đ), định dạng ngày
 │
@@ -89,7 +92,7 @@ chmod +x start.sh
 
 Kịch bản sẽ tự động:
 1. Khởi động PostgreSQL 16 trên cổng `5432` và chờ kiểm tra trạng thái sẵn sàng.
-2. Áp dụng toàn bộ 14 migration Flyway (V1 → V14) và khởi động API Spring Boot trên cổng `8080`.
+2. Áp dụng toàn bộ 17 migration Flyway (V1 → V17) và khởi động API Spring Boot trên cổng `8080`.
 3. Nạp bộ dữ liệu mẫu chuẩn (Dây hụi 10 kỳ với đầy đủ bỏ thăm, sổ cái cân bằng, tiền thảo và thanh toán).
 4. Khởi động giao diện Next.js trên cổng `3000`.
 
@@ -173,7 +176,7 @@ Sau khi khởi động với `--seed`, bạn có thể truy cập các dịch v�
 ## 🧪 Kiểm Thử & Đảm Bảo Chất Lượng (Testing & Verification)
 
 ### Kiểm Thử Backend (JUnit 5 + Spring Boot Test + Testcontainers)
-Toàn bộ hệ thống backend được bao phủ bởi **184 ca kiểm thử tự động**, bao gồm kiểm thử toán học biên, ma trận phân quyền chéo tenant, kiểm thử tương tranh và kiểm thử xuất file CSV/XLSX.
+Toàn bộ hệ thống backend được bao phủ bởi **224 ca kiểm thử tự động**, bao gồm kiểm thử toán học biên, ma trận phân quyền chéo tenant, kiểm thử tương tranh và kiểm thử xuất file CSV/XLSX.
 
 Từ **Step 28 (2026-10-08)** bộ test chạy **hermetic** bằng Testcontainers: mỗi lần `mvn test`
 tự khởi động một container `postgres:16` cô lập (Flyway migrate toàn bộ schema từ đầu) —
@@ -185,7 +188,7 @@ mvn test
 ```
 ```
 [INFO] Results:
-[INFO] Tests run: 184, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 224, Failures: 0, Errors: 0, Skipped: 0
 [INFO] BUILD SUCCESS
 ```
 
@@ -195,14 +198,14 @@ Mã nguồn frontend được kiểm tra nghiêm ngặt theo các tiêu chuẩn 
 ```bash
 cd apps/web
 npm run lint     # 0 errors, 0 warnings
-npm run build    # 13/13 routes tĩnh và động biên dịch thành công
+npm run build    # 14/14 routes tĩnh và động biên dịch thành công
 ```
 
 ---
 
-## 📜 Tiến Độ Thực Hiện 31 Giai Đoạn (Build Roadmap)
+## 📜 Tiến Độ Thực Hiện 37 Giai Đoạn (Build Roadmap)
 
-Hệ thống đã hoàn tất trọn vẹn **31/31 giai đoạn** theo đúng lộ trình đặc tả (`docs/monkey_ai/STATUS.md` + `plan.md`):
+Hệ thống đã hoàn tất trọn vẹn **37/37 giai đoạn** theo đúng lộ trình đặc tả (`docs/monkey_ai/STATUS.md` + `plan.md`):
 
 | Giai Đoạn | Tên Giai Đoạn | Nội Dung Hoàn Thành |
 |:---:|---|---|
@@ -238,6 +241,12 @@ Hệ thống đã hoàn tất trọn vẹn **31/31 giai đoạn** theo đúng l�
 | **29** | **Late Fees Delivery** | Thu phí trễ hạn, chốt sổ tự động, queuing thanh toán, hiển thị đủ trên sổ cái & sao kê (Flyway V14) |
 | **30** | **CSV / Excel Exports** | Xuất sổ cái, báo cáo tiền thảo & sao kê hội viên ra **CSV** và **XLSX (Apache POI)** — cột đầy đủ, dòng TOTAL, phòng chống formula injection |
 | **31** | **Wrap-up & Cleanup** | Dọn tài liệu lỗi thời (README, chỉ mục, kiến trúc), xác minh toàn bộ qua Docker compose, kiểm tra suite + build cuối cùng |
+| **32** | **Attachments (Phase 2 #1)** | Đính kèm hình biên nhận trên khoản đóng & hồ sơ hội viên (Flyway V15 `attachments`, BYTEA), lịch sử `GET /groups/{id}/payments`, UI chủ hụi + hội viên, i18n ×4 |
+| **33** | **Blacklist + Enforced Status (Phase 2 #2)** | Danh sách đen theo chủ hụi (Flyway V16 `member_blacklists`), BLOCKED → không đăng nhập, INACTIVE/BLOCKED → không bỏ thăm, UI quản lý blacklist, i18n ×4 |
+| **34** | **KHQR per Obligation (Phase 2 #3)** | Mã KHQR EMVCo thật (CRC16, `TONGTIN <code>-O<entryId>`) trên nghĩa vụ chưa đóng (debts + statement), render PNG, i18n ×4 |
+| **35** | **Telegram Notifications (Phase 2 #4)** | Thông báo Telegram theo chủ hụi (Flyway V17 `telegram_chat_id`), sự kiện vòng hụi + daily due-digest, tab `/host/telegram`, i18n ×4 |
+| **36** | **Quick-pay Single-Step Settlement (Phase 2 #5)** | `POST /groups/{id}/quick-pay`: chủ hụi nhập tổng tiền, hệ thống tự phân bổ vào nghĩa vụ cũ nhất (kể cả late fee) qua core dùng chung của `PaymentService.record()` |
+| **37** | **Wrap-up (Phase 2 #6)** | Rà soát toàn bộ tài liệu (README ×2, plan.md, roadmaps, STATUS), final suite `mvn package` (224), `npm run build` 14/14, Docker compose click-through (3 services healthy) |
 
 ---
 

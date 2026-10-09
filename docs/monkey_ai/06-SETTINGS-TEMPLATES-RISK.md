@@ -254,6 +254,25 @@ Do not put formula scripts on this page.
 
 Keep Step 01-17 as they are.
 
+Step 35 Telegram (delivered) — settings live in the admin catalog as a new
+**TELEGRAM** category (5th), NOT on `/host/settings`:
+`telegram_bot_token` (SECRET; blank ⇒ whole channel off), `telegram_events_enabled`
+(BOOLEAN true), `telegram_daily_digest_enabled` (BOOLEAN false), `telegram_daily_digest_time`
+(STRING `HH:mm`, `08:00`). Hosts only ever supply their own chat id + a test-send
+(`/host/telegram`), matching the "host gateway" pattern: the secret stays
+admin-owned and admins can switch every outbound ping off in one place.
+
+Telegram-specific risk notes:
+- **Message ≠ money.** Telegram is announce-only; a phishing-style false
+  "payment recorded" ping can never confirm a payment server-side.
+- **No member PII in digests.** Digest messages carry group name/code and
+  aggregate counts + total minor units — no member names/phones.
+- **Outbound is fire-and-forget.** Wrap every send; a Telegram 403/404 (bot
+  removed from chat) or network failure is logged, never raised into the
+  business call.
+- **Token is SECRET-typed** (masked on GET like `payway_api_key`); a token can
+  be rotated by overwriting the value.
+
 Parked additions:
 
 ```
@@ -280,3 +299,31 @@ Earliest sensible code:
 - Meeting issue prevention: YES as cycle snapshot + dispute lock, not a meeting app
 - Blacklist: YES owner-local; NO global wall
 - Default + custom design templates: YES as group recipes; visual themes later
+
+## 10. Telegram decision log (Step 35, 2026-10-09)
+
+- Channel is **host-only** (no member Telegram); in-app feed stays the member channel.
+- Real Bot API call (`sendMessage`) behind a tiny `TelegramClient` seam — hermetic
+  tests never touch the network (token blank short-circuits; `@MockBean` captures sends).
+- Settings-gated: `telegram_bot_token` blank ⇒ events + digest + test all no-op.
+- Digest opt-in (`telegram_daily_digest_enabled` default false), runs daily at
+  `telegram_daily_digest_time`; Step 14's "sync transitions only, no @Scheduled money
+  reminders" is respected — the digest only *announces* owed totals, never triggers them.
+- Events are delivered synchronously after the business write, best-effort
+  (mirror `NotificationService`); never throws into / rolls back a financial op.
+- Chat id stored on `owner_accounts.telegram_chat_id` (V17, BIGINT, nullable, no FK —
+  it is a third-party identifier, not an app row).
+
+## 11. Quick-pay decision log (Step 36, 2026-10-09)
+
+- The **backend** picks which obligations are paid; the host only supplies
+  member + total. Pool = member's UNPAID/PARTIAL `direction='IN'` obligations in
+  the group, LATE_FEE rows included by default (`allocateLateFees` opt-out).
+- Allocation order is **oldest-due-first, tie to lower entry id** (plan §20);
+  allocations sum exactly to the paid amount (min(remaining, leftover)).
+- Quick-pay is a **normal `payments` row** — same core path as POST /payments
+  (locking, idempotency, notifications, Telegram ping, audit with
+  `autoAllocated: true`). Receipt attach stays the existing
+  `POST /payments/{id}/attachments`.
+- Fail-fast: amount > total remaining → 400; member not in group → 404; nothing
+  outstanding → 400. No migrations.

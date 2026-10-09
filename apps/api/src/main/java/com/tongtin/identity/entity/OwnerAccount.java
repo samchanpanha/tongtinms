@@ -43,6 +43,9 @@ public class OwnerAccount {
     @Column(name = "city")
     private String city;
 
+    @Column(name = "telegram_chat_id")
+    private Long telegramChatId;
+
     @Column(name = "default_currency", nullable = false)
     private String defaultCurrency = "VND";
 
@@ -135,6 +138,14 @@ public class OwnerAccount {
 
     public void setCity(String city) {
         this.city = city;
+    }
+
+    public Long getTelegramChatId() {
+        return telegramChatId;
+    }
+
+    public void setTelegramChatId(Long telegramChatId) {
+        this.telegramChatId = telegramChatId;
     }
 
     public String getDefaultCurrency() {

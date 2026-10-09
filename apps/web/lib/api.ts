@@ -77,6 +77,29 @@ export interface AdminInsights {
   }>;
 }
 
+export interface AttachmentMeta {
+  id: number;
+  entityType: "PAYMENT" | "MEMBER";
+  entityId: number;
+  originalName: string;
+  contentType: string;
+  sizeBytes: number;
+  uploadedAt: string;
+}
+
+export interface PaymentRecord {
+  id: number;
+  groupId: number;
+  amountMinor: number;
+  currency: string;
+  method: string;
+  paidAt: string;
+  note: string | null;
+  createdAt: string;
+  allocations: Array<{ ledgerEntryId: number; amountMinor: number }>;
+  attachments: AttachmentMeta[];
+}
+
 const TOKEN_KEY = "tongtin_access_token";
 const USER_KEY = "tongtin_auth_data";
 
@@ -167,8 +190,13 @@ async function download(endpoint: string, fallbackFilename: string): Promise<voi
   }
   const blob = await res.blob();
   const disposition = res.headers.get("Content-Disposition") || "";
+  const starMatch = /filename\*=UTF-8''([^;]+)/i.exec(disposition);
   const nameMatch = /filename="([^"]+)"/.exec(disposition);
-  const filename = nameMatch ? nameMatch[1] : fallbackFilename;
+  const filename = starMatch
+    ? decodeURIComponent(starMatch[1])
+    : nameMatch
+      ? nameMatch[1]
+      : fallbackFilename;
   const objectUrl = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = objectUrl;
@@ -177,6 +205,30 @@ async function download(endpoint: string, fallbackFilename: string): Promise<voi
   anchor.click();
   anchor.remove();
   URL.revokeObjectURL(objectUrl);
+}
+
+/** Fetches an obligation's KHQR PNG (Bearer-authed; the image itself cannot hold the header) */
+async function fetchObligationQr(entryId: number | string): Promise<string> {
+  const token = getStoredToken();
+  const headers = new Headers();
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+  const res = await fetch(`/api/v1/obligations/${entryId}/khqr`, { headers });
+  if (!res.ok) {
+    let errorMsg = `Request failed (HTTP ${res.status})`;
+    try {
+      const errJson = await res.json();
+      errorMsg = errJson.message || errJson.error || errorMsg;
+    } catch {
+      // ignore
+    }
+    const error = new Error(errorMsg) as Error & { status: number };
+    error.status = res.status;
+    throw error;
+  }
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
 }
 
 export const api = {
@@ -242,6 +294,7 @@ export const api = {
     status: string;
     loginEnabled: boolean;
     createdAt: string;
+    attachments: AttachmentMeta[];
   }>> {
     const query = q ? `?q=${encodeURIComponent(q)}` : "";
     return request(`/members${query}`);
@@ -259,6 +312,60 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ password }),
     });
+  },
+
+  async updateMember(
+    memberId: number,
+    body: { fullName?: string; phone?: string; note?: string; status?: string },
+  ) {
+    return request<{
+      id: number;
+      fullName: string;
+      phone: string;
+      status: string;
+      createdAt: string;
+      attachments: AttachmentMeta[];
+    }>(`/members/${memberId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    });
+  },
+
+  async getBlacklist(): Promise<Array<{
+    id: number;
+    phone: string;
+    reason: string | null;
+    active: boolean;
+    createdAt: string;
+    updatedAt: string | null;
+  }>> {
+    return request(`/members/blacklist`);
+  },
+
+  async addBlacklist(body: { phone: string; reason?: string }) {
+    return request<{
+      id: number;
+      phone: string;
+      reason: string | null;
+      active: boolean;
+      createdAt: string;
+      updatedAt: string | null;
+    }>(`/members/blacklist`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  },
+
+  async unlistBlacklist(id: number) {
+    return request<{ id: number; phone: string; active: boolean }>(`/members/blacklist/${id}`, {
+      method: "DELETE",
+    });
+  },
+
+  async uploadMemberAttachment(memberId: number, file: File): Promise<AttachmentMeta> {
+    const form = new FormData();
+    form.append("file", file);
+    return request(`/members/${memberId}/attachments`, { method: "POST", body: form });
   },
 
   // Groups
@@ -392,6 +499,41 @@ export const api = {
     });
   },
 
+  /** Step 36: host types one total; the backend auto-allocates oldest-first. */
+  async quickPay(
+    groupId: number | string,
+    body: Record<string, unknown>,
+    idempotencyKey?: string
+  ): Promise<{ id: number }> {
+    const headers: Record<string, string> = {};
+    if (idempotencyKey) {
+      headers["Idempotency-Key"] = idempotencyKey;
+    }
+    return request<{ id: number }>(`/groups/${groupId}/quick-pay`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    });
+  },
+
+  async getPayments(groupId: number | string): Promise<PaymentRecord[]> {
+    return request(`/groups/${groupId}/payments`);
+  },
+
+  async uploadPaymentAttachment(paymentId: number, file: File): Promise<AttachmentMeta> {
+    const form = new FormData();
+    form.append("file", file);
+    return request(`/payments/${paymentId}/attachments`, { method: "POST", body: form });
+  },
+
+  async deleteAttachment(attachmentId: number): Promise<void> {
+    return request(`/attachments/${attachmentId}`, { method: "DELETE" });
+  },
+
+  async downloadAttachment(attachmentId: number, fallbackName: string): Promise<void> {
+    return download(`/attachments/${attachmentId}`, fallbackName);
+  },
+
   async getDebts(groupId: number | string): Promise<Array<{
     ledgerEntryId: number;
     cycleId: number;
@@ -407,8 +549,14 @@ export const api = {
     status: string;
     dueAt: string;
     overdueDays: number;
+    khqr?: string | null;
   }>> {
     return request(`/groups/${groupId}/debts`);
+  },
+
+  /** Obligation KHQR as a blob URL for an <img> (Bearer token travels via header) */
+  fetchObligationQr(entryId: number | string): Promise<string> {
+    return fetchObligationQr(entryId);
   },
 
   async assessLateFees(groupId: number | string): Promise<{
@@ -535,6 +683,7 @@ export const api = {
         remaining?: { currency: string; amountMinor: number; exponent: number; symbol: string };
         runningBalance?: { currency: string; amountMinor: number; exponent: number; symbol: string };
         runningPosition?: { currency: string; amountMinor: number; exponent: number; symbol: string };
+        khqr?: string | null;
       }>;
       totals?: {
         contributed: { currency: string; amountMinor: number; exponent: number; symbol: string };
@@ -813,5 +962,42 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ values }),
     });
+  },
+
+  // Telegram (host channel)
+  async getTelegramStatus(): Promise<{
+    chatId: number | null;
+    linked: boolean;
+    eventsEnabled: boolean;
+    digestEnabled: boolean;
+    digestTime: string;
+    eventsConfigured: boolean;
+  }> {
+    return request("/host/telegram");
+  },
+
+  async setTelegramChatId(chatId: number | null): Promise<{
+    chatId: number | null;
+    linked: boolean;
+    eventsEnabled: boolean;
+    digestEnabled: boolean;
+    digestTime: string;
+    eventsConfigured: boolean;
+  }> {
+    return request("/host/telegram/chat-id", {
+      method: "PUT",
+      body: JSON.stringify({ chatId }),
+    });
+  },
+
+  async testTelegram(): Promise<{
+    chatId: number | null;
+    linked: boolean;
+    eventsEnabled: boolean;
+    digestEnabled: boolean;
+    digestTime: string;
+    eventsConfigured: boolean;
+  }> {
+    return request("/host/telegram/test", { method: "POST" });
   },
 };

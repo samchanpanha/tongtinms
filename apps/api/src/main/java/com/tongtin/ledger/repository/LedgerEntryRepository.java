@@ -32,6 +32,20 @@ public interface LedgerEntryRepository extends JpaRepository<LedgerEntry, Long> 
             """)
     List<LedgerEntry> findOverdueByGroup(@Param("groupId") Long groupId, @Param("now") java.time.Instant now);
 
+    /**
+     * Step 36: a member's outstanding obligations (contributions + LATE_FEE)
+     * for quick-pay auto-allocation. Order is the locked plan §20 tie-break:
+     * oldest due first, then lower entry id.
+     */
+    @Query("""
+            SELECT e FROM LedgerEntry e
+            WHERE e.groupId = :groupId AND e.memberProfileId = :memberProfileId
+              AND e.direction = 'IN' AND e.status IN ('UNPAID', 'PARTIAL')
+            ORDER BY e.dueAt, e.id
+            """)
+    List<LedgerEntry> findOutstandingForMember(@Param("groupId") Long groupId,
+                                               @Param("memberProfileId") Long memberProfileId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT e FROM LedgerEntry e WHERE e.id = :id")
     Optional<LedgerEntry> findByIdForUpdate(@Param("id") Long id);

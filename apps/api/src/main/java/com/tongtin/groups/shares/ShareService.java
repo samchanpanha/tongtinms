@@ -1,6 +1,7 @@
 package com.tongtin.groups.shares;
 
 import com.tongtin.common.errors.BadRequestException;
+import com.tongtin.common.errors.ConflictException;
 import com.tongtin.common.errors.NotFoundException;
 import com.tongtin.groups.dto.GroupResponse;
 import com.tongtin.groups.entity.Group;
@@ -9,6 +10,7 @@ import com.tongtin.groups.shares.dto.ShareAssignRequest;
 import com.tongtin.groups.shares.dto.ShareResponse;
 import com.tongtin.groups.shares.entity.GroupShare;
 import com.tongtin.groups.shares.repository.GroupShareRepository;
+import com.tongtin.members.blacklist.service.BlacklistService;
 import com.tongtin.members.entity.MemberProfile;
 import com.tongtin.members.repository.MemberProfileRepository;
 import java.util.List;
@@ -21,13 +23,16 @@ public class ShareService {
     private final GroupRepository groupRepository;
     private final GroupShareRepository shareRepository;
     private final MemberProfileRepository memberProfileRepository;
+    private final BlacklistService blacklistService;
 
     public ShareService(GroupRepository groupRepository,
                         GroupShareRepository shareRepository,
-                        MemberProfileRepository memberProfileRepository) {
+                        MemberProfileRepository memberProfileRepository,
+                        BlacklistService blacklistService) {
         this.groupRepository = groupRepository;
         this.shareRepository = shareRepository;
         this.memberProfileRepository = memberProfileRepository;
+        this.blacklistService = blacklistService;
     }
 
     @Transactional
@@ -37,6 +42,9 @@ public class ShareService {
 
         MemberProfile member = memberProfileRepository.findByOwnerIdAndId(ownerId, request.memberProfileId())
                 .orElseThrow(() -> new NotFoundException("Member not found"));
+        blacklistService.activeReason(ownerId, member.getPhone()).ifPresent(reason -> {
+            throw new ConflictException("This phone is blacklisted: " + reason);
+        });
         if (!"ACTIVE".equals(member.getStatus())) {
             throw new BadRequestException("Member is not active");
         }

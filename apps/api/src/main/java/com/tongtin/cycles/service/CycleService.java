@@ -9,6 +9,8 @@ import com.tongtin.groups.entity.Group;
 import com.tongtin.groups.repository.GroupRepository;
 import com.tongtin.identity.service.AuditService;
 import com.tongtin.notify.service.NotificationService;
+import com.tongtin.telegram.TelegramMessages;
+import com.tongtin.telegram.TelegramNotifier;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -22,15 +24,18 @@ public class CycleService {
     private final CycleRepository cycleRepository;
     private final GroupRepository groupRepository;
     private final NotificationService notificationService;
+    private final TelegramNotifier telegramNotifier;
     private final AuditService auditService;
 
     public CycleService(CycleRepository cycleRepository,
                         GroupRepository groupRepository,
                         NotificationService notificationService,
+                        TelegramNotifier telegramNotifier,
                         AuditService auditService) {
         this.cycleRepository = cycleRepository;
         this.groupRepository = groupRepository;
         this.notificationService = notificationService;
+        this.telegramNotifier = telegramNotifier;
         this.auditService = auditService;
     }
 
@@ -84,6 +89,8 @@ public class CycleService {
                 "Ky " + nextNo + " mo",
                 of("Ky %d/%d cua hoi \"%s\" da mo. Han chot dau gia: %s.",
                         nextNo, group.getCycleCount(), group.getName(), cycle.getBidCloseAt()));
+        telegramNotifier.notifyGroupOwner(group, "CYCLE_OPENED",
+                TelegramMessages.cycleOpened(group, nextNo, group.getCycleCount(), cycle.getBidCloseAt()));
         auditService.record(userId, "Cycle", cycle.getId(), "CYCLE_OPENED",
                 Map.of("cycleNo", cycle.getCycleNo(),
                         "status", cycle.getStatus(),

@@ -12,6 +12,8 @@ public interface OwnerAccountRepository extends JpaRepository<OwnerAccount, Long
 
     Optional<OwnerAccount> findByUserId(Long userId);
 
+    List<OwnerAccount> findByTelegramChatIdIsNotNull();
+
     List<OwnerAccount> findBySubscriptionEndsAtBeforeAndSubscriptionStatusNotIn(
             Instant cutoff, Collection<String> excludedStatuses);
 

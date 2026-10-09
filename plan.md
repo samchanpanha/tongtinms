@@ -41,10 +41,16 @@
 | 29 | Late fees (host-triggered assessment) | ✅ DONE (2026-10-08) — V14 late-fee partial index, `FormulaEngine.lateFee` (half-up), `LateFeeService` cumulative delta idempotency, `POST /groups/{id}/late-fees/assess`, Apply-Late-Fees button + i18n x4; 14 new tests → 179 pass (see §17) |
 | 30 | CSV/Excel export (ledger, profit, member statement) | ✅ DONE (2026-10-08) — poi-ooxml 5.5.1, CSV (UTF-8 BOM + RFC 4180 + formula-injection guard) and real .xlsx; `GET /export/{ledger,profit}` (HOST) + `/me/groups/{id}/export/statement` (MEMBER); `com.tongtin.reports.export` renders the Step 15 report DTOs (no new queries/math); buttons + i18n x12; 5 new tests → 184 pass (see §18) |
 | 31 | Wrap-up & cleanup | ✅ DONE (2026-10-08) — stale docs refreshed (README/00-INDEX/02-ARCH §3/03-BUILD-ROADMAP), Docker compose rebuilt + click-through (all 3 healthy, Flyway V1→V14 on existing volume, export sweep live), final `mvn test` 184 pass + `npm run build` 13/13 (see §19) |
+| 32 | Attachments (receipts + member docs) | ✅ DONE (2026-10-09) — V15 `attachments` BYTEA (owner-scoped, no path vector), `com.tongtin.attachments` HOST upload/stream/delete, new `GET /groups/{id}/payments` history, `storage_attachment_*` SECURITY settings, host receipts UI + member Files modal, i18n ×4; 7 new `AttachmentTests` → 191 pass (see §21) |
+| 33 | Blacklist + enforced member status | ✅ DONE (2026-10-09) — V16 `member_blacklists` (owner-local phone list, soft unlist), `com.tongtin.members.blacklist` HOST manager API + UI, BLOCKED→no login, INACTIVE/BLOCKED→no bid, blacklisted phone → 409 on add-member/add-share, status column + i18n ×4; 5 new `BlacklistTests` → 196 pass (see §22) |
+| 34 | KHQR per obligation (real EMVCo CRC16) | ✅ DONE (2026-10-09) — `com.tongtin.khqr`: pure EMVCo generator (CRC16-CCITT 0x1021, golden 0x29B1) + `ObligationQrService`/`ObligationQrController` (image/png render), `khqr` on debts + statement rows (IN/remaining>0 only), `payments_khqr_enabled` setting, zxing 3.5.3; host debts + member statement QR modals, i18n ×4; 10 new `KhqrTests` → 206 pass (see §23) |
+| 35 | Telegram per-host chat + events + daily due-digest | ✅ DONE (2026-10-09) — V17 `owner_accounts.telegram_chat_id`, `com.tongtin.telegram` (client seam `BotApiTelegramClient`, best-effort `TelegramNotifier`, pure `TelegramMessages`, `TelegramService`, gated `TelegramDigestJob`), TELEGRAM settings category (bot token / events / digest toggle+time), host-only chat-id link + test-send + audit, six event hooks, `/host/telegram` page + navbar + i18n ×4; 7 new `TelegramTests` (mock client, zero network) → 213 pass (see §24) |
+| 36 | Quick-pay single-step settlement | ✅ DONE (2026-10-09) — `POST /groups/{id}/quick-pay`: host picks member + total, backend auto-allocates oldest-due-first (then entry id) incl. LATE_FEE (opt-out) across the member's UNPAID/PARTIAL direction-IN debts via SHARED `recordCore` (audit `autoAllocated`), normal payments row + idempotency replay + fail-fast guards; host modal + i18n ×4; 11 new `QuickPayTests` → 224 pass (see §25) |
+| 37 | Wrap-up: full docs pass, suite + build + Docker click-through, close-out | ✅ DONE (2026-10-09) — README.md + README_VN.md refreshed (badges 224, migrations V1→V17, 14 routes, module tree + attachments/khqr/telegram, 37-step roadmap incl. Phase 2 rows), 03-BUILD-ROADMAP Phase 2 table + stale row-31 fix, plan.md §26, STATUS close-out; `mvn -o package` BUILD SUCCESS (full suite 224/0 + jar), `npm run build` 14/14, Docker compose rebuilt + click-through (postgres/api/web all healthy; api health 200, web /login 200, api auth 401) (see §26) |
 
-**Overall phase:** `completed` — planning 100%, code **18/18 MVP steps done** + Steps 19–21 SaaS/settings/Docker (§7–§9) + 4-locale i18n pass (§10) + Step 22 release-gate audit (§11) + Step 24 PayWay return flow (§12) + Step 25 payment forensics (§13) + Step 26 checkout idempotency (§14) + Step 27 index & insights (§15) + Step 28 hermetic tests (§16).
+**Overall phase:** `complete` — Steps 00–37 all done (suite **224**, web lint/tsc/build clean, Docker stack green, nothing committed).
 **Blockers:** none.
-**Next action:** Approved track (A+B, core-only) continues with **Step 29 — late fees (V14)** (plan §6); Step 23 collapsed (audit found no behavior gaps).
+**Next action:** Phase 2 continues with **Step 36 — Quick-pay single-step settlement** (plan §20). Step 23 collapsed (audit found no behavior gaps).
 
 ### Easy follow steps (how to run every session)
 
@@ -987,3 +993,337 @@ statement 403, anon→401.
 ### 19.4 Open items (user-gated only)
 - §7.5 formula reminders (ranks 6–7) — need explicit user OK.
 - Parked P-items (incl. P2 PDF print templates) — parked unless requested.
+
+## 20. Phase 2 roadmap — Steps 32–37 (approved 2026-10-08)
+
+User approved the phase-2 plan. One step per session (protocol). Standing
+doc-gate → implement → tests → STATUS.md rhythm unchanged; zero-float grep gate
+and hermetic Testcontainers suite stay enforced. Open micro-decisions confirmed at
+the relevant doc gates: KHQR = real EMVCo CRC16 for obligation QRs (Step 34, keep the
+subscription string untouched); attachments = BYTEA in Postgres (Step 32);
+quick-pay tie order = oldest due first then entry id (Step 36).
+
+| Step | What ships | DB |
+|:---:|---|---|
+| 32 | Attachments (BYTEA): receipts on payments + member docs; HOST upload/stream/delete; GET /groups/{id}/payments history with allocations + attachments; SettingsCatalog storage limits | V15 `attachments` |
+| 33 | Blacklist (per-owner phone) + enforced member status: BLOCKED→no login, INACTIVE→no bid/no debt QR; host UI + blacklist manager | V16 `member_blacklists` |
+| 34 | KHQR per obligation (real EMVCo CRC16, ref `TONGTIN <code>-O<entryId>`): `khqr` on debts + statement rows; `payments_khqr_enabled`; qrcode render + statement row rework | none |
+| 35 | Telegram per-host chat + events + daily due-digest job; TELEGRAM settings category; host chat-id + test-send | ✅ DONE — V17 `owner_accounts.telegram_chat_id`, see §24 |
+| 36 | Quick-pay for a member (auto-allocate oldest-first incl. LATE_FEE) + receipt attach; share PaymentService internals | ✅ DONE — see §25 |
+| 37 | Wrap-up: full docs pass, suite + build + Docker click-through, close-out | ✅ DONE — see §26 |
+
+Complete-to-Do details live in `plan.md §21+` per step and `docs/monkey_ai/STATUS.md`.
+
+## 21. Attachments (Step 32, 2026-10-09)
+
+### 21.1 Doc gate (BEFORE code)
+- `02-ARCHITECTURE.md` §4: `attachments` table (+ `idx_attachments_owner_entity`); §5:
+  "Attachments (Step 32)" contract — endpoints, `AttachmentResponse` shape, storage settings,
+  and the new `GET /groups/{id}/payments` history route.
+- `01-DOMAIN.md` §15: attachment semantics (evidence only; money never derived from a file).
+
+### 21.2 Backend
+- V15 `attachments` (BYTEA, owner-scoped; `entity_type` CHECK PAYMENT|MEMBER; `size_bytes` > 0;
+  `uploaded_by_user_id` FK users) — no filesystem, no path vector.
+- `com.tongtin.attachments` (entity/repository/dto/service/web). `AttachmentService`: owner-scoped
+  attach/stream/delete (cross-owner → 404), empty → 400, allow-list → 400, size cap → 400, audit
+  `ATTACHMENT_UPLOADED`/`ATTACHMENT_DELETED` in the same tx.
+- Endpoints (HOST): `POST /payments/{id}/attachments`, `POST /members/{id}/attachments` (multipart
+  `file`), `GET /attachments/{id}` (bytes + content-type + `Content-Disposition`), `DELETE
+  /attachments/{id}` → 204; plus `GET /groups/{id}/payments` (history with `allocations[]` +
+  `attachments[]`).
+- Limits via two new SECURITY catalog keys: `storage_attachment_max_mb` (1–50, default 10) and
+  `storage_attachment_allowed_types` (default png/jpeg/gif/webp/pdf/xlsx/xls/csv) — live, no migration.
+- `PaymentResponse` + `MemberResponse` gained `attachments[]`; member list/update/deactivate
+  batch-fill via `metadataForMany`.
+
+### 21.3 Web
+- `lib/api.ts`: `AttachmentMeta`/`PaymentRecord`, `getPayments`, upload/delete/download helpers,
+  `filename*=UTF-8''` parse; `lib/format.ts` `formatBytes`; i18n ×4.
+- Host group page: "Payment History & Receipts" (per-payment receipt upload/list/delete) in the
+  payments tab. Members page: per-row Files modal (upload/list/download/delete).
+
+### 21.4 Verification
+- `AttachmentTests` (7 new): receipt upload → history `allocations[]`/`attachments[]` + byte-exact
+  stream; member doc in directory → delete → 404; disallowed type + empty rejected (nothing
+  persisted); oversize rejected against configured limit (11MB default then live 1MB) with in-limit
+  OK; narrowed allow-list; cross-owner upload/download/delete/history → 404; anon → 401.
+- `mvn test` → **191 tests, 0 failures**; web `eslint` + `tsc --noEmit` clean; zero-float gate green.
+  Nothing committed (standing rule); Docker stack left running.
+
+### 21.5 Decisions
+- Attachments at PAYMENT/MEMBER level only (not allocations); member-portal read of own receipts
+  deferred to Step 34; debts response unchanged.
+
+## 22. Blacklist + enforced member status (Step 33, 2026-10-09)
+
+### 22.1 Doc gate (BEFORE code)
+- `02-ARCHITECTURE.md` §4: `member_profiles.status` note (no `user_id` column) + new
+  `member_blacklists (V16)` table block (+ index); §5: new "Blacklist (Step 33)" contract —
+  endpoints, response shape, enforcement points.
+- `01-DOMAIN.md` §6: member profile status semantics (ACTIVE/INACTIVE/BLOCKED) + blacklist rules
+  (owner-local, suggest-not-auto-ban, unlist is soft).
+
+### 22.2 Backend
+- V16 `member_blacklists`: id, owner_id FK owner_accounts, phone, reason, active DEFAULT true,
+  created_by_user_id FK users, created_at, updated_at; UNIQUE `(owner_id, phone)`;
+  index `(owner_id, active)`. Table named per roadmap (`member_blacklists`), not the spec's
+  `owner_blacklist`.
+- `com.tongtin.members.blacklist`: entity/repository/dto/service/web. `BlacklistService`:
+  owner-scoped list/add/unlist + `activeReason`; unlist = soft `active=false` (row never deleted);
+  re-add reactivates the same row; audit `BLACKLIST_ADDED`/`BLACKLIST_REMOVED` in the same tx.
+- Endpoints (HOST, `/api/v1/members/blacklist`): `GET` (list), `POST` (add → 201, duplicate ACTIVE
+  → 409), `DELETE /{id}` (unlist → 200, cross-owner → 404). Literal path wins over `/members/{id}`.
+- Enforcement: `MemberService.create` rejects a blacklisted phone (409, reason included);
+  `ShareService.assign` rejects blacklisted phone (409) + non-ACTIVE member (400);
+  `BidService.placeBid` rejects non-ACTIVE member (400); `MemberService.update` runs
+  `syncLoginStatus` (BLOCKED → linked MEMBER `users.status='BLOCKED'`, else ACTIVE; HOST accounts
+  and non-MEMBER users untouched); `setLogin` → 409 on a BLOCKED member. Existing login status check
+  in `AuthService` then refuses BLOCKED logins (401).
+
+### 22.3 Web
+- `lib/api.ts`: `updateMember`, `getBlacklist`, `addBlacklist`, `unlistBlacklist`.
+- `/host/members`: per-row status `<select>` (ACTIVE/INACTIVE/BLOCKED) + inline error banner, and a
+  "Phone Blacklist" manager section (add form, active/unlisted badges, unlist button, banners).
+- i18n ×4: status keys + blacklist keys in `types.ts` + en/vi/km/zh.
+
+### 22.4 Verification
+- `BlacklistTests` (5 new): add/list/duplicate-409/soft-unlist/reactivate-same-id; blacklisted phone
+  → 409 on add-member + add-share; BLOCKED → login 401 and set-login 409, ACTIVE restores login;
+  INACTIVE → no bid on host AND member routes, ACTIVE restores; cross-owner unlist → 404,
+  member role → 403, anon → 401. Phone is stored/returned normalized `+84…`.
+- `mvn test` → **196 tests, 0 failures** (191 + 5); web `eslint` + `tsc --noEmit` clean;
+  zero-float gate green. Nothing committed (standing rule); Docker stack left running.
+
+### 22.5 Decisions
+- Table named `member_blacklists` (roadmap) rather than the spec doc's `owner_blacklist`.
+- Owner-local only, never global; unlist never deletes the row (audit history preserved).
+- Auto-suggest warning (06-SETTINGS-TEMPLATES-RISK §4.3) deferred; "no debt QR" deferred to Step 34.
+
+## 23. Obligation KHQR (Step 34, 2026-10-09)
+
+### 23.1 Doc gate (BEFORE code)
+- `02-ARCHITECTURE.md`: new "Obligation KHQR (Step 34)" contract under Payments — EMVCo layout +
+  bill ref `TONGTIN <code>-O<entryId>` (capped at the 25-char EMVCo field), real CRC16-CCITT,
+  `payments_khqr_enabled` PAYMENT setting, render endpoint + scope/authz (host own group, member own
+  share, cross-scope 404, anon 401), subscription KHQR string untouched, QR is display-only (money
+  never read back); statement `Entry` contract gains `khqr`.
+- `01-DOMAIN.md` **§16 "Obligation QR (Step 34)"**; `07-MULTI-CURRENCY.md` **§10 "EMVCo/KHQR amount
+  rendering (Step 34)"** — ISO 4217 numeric codes (VND 704, KHR 116, LAK 418, USD 840, THB 764, SGD
+  702) + exponent-aware major-unit decimal using long math only.
+
+### 23.2 Backend
+- `com.tongtin.khqr.KhqrGenerator` — pure Java, no Spring/DB. Layout `000201010212` + tag 26
+  (GIF `com.tongtin` + sanitized merchant subfield) + 52 `5999` + 53 numeric code + 54 decimal
+  amount + 58 `KH` + 59 merchant name (≤25) + 60 `PHNOM PENH` (≤15) + 62/01 bill ref + `6304`
+  genuine CRC16-CCITT (poly 0x1021, init 0xFFFF, over base + `"6304" + "0000"`); golden vector
+  `crc16Of("123456789") == 0x29B1`. `isValid` recomputes the CRC (no bogus `endsWith("6304")`).
+- `ObligationQrService.payload(groupCode, entryId, merchantName, remainingMinor, currency)` shared by
+  debts/statement/render — null when disabled, unsupported currency, or not an obligation.
+  `renderable(role, userId, ownerId, entryId)`: HOST → ownerId match; MEMBER → own share (phone →
+  profiles → shares). **Obligations are `direction = IN`; QR only for IN with `remaining > 0`.**
+  `allocated(entryId)` reads `rows.get(0)[1]` (sum, not entry id).
+- `ObligationQrController` — `GET /api/v1/obligations/{ledgerEntryId}/khqr` → `image/png` (zxing
+  3.5.3 `QRCodeWriter` + `MatrixToImageWriter`, 480px, PNG magic bytes verified), 404 via
+  `NotFoundException` when payload null, `@PreAuthorize("hasAnyRole('HOST','MEMBER')")`.
+- Wiring: `DebtResponse` + `PaymentService.debts` gain nullable `khqr` (PARTIAL reflects remaining);
+  `MemberStatementResponse.Entry` + `MemberReportService` gain `khqr` (UNPAID/PARTIAL IN only);
+  `SettingsCatalog` PAYMENT key `payments_khqr_enabled` (BOOLEAN, default true).
+
+### 23.3 Web
+- `lib/api.ts`: standalone `fetchObligationQr(entryId)` → blob URL (Bearer rides the header; a PNG
+  cannot) + `api.fetchObligationQr`; `khqr?: string | null` in `getDebts` and statement entry types.
+- `/host/groups/[id]`: "View QR" button in debts actions cell when `d.khqr` + KHQR modal
+  (desc, cycle badge, amount = remaining via `formatMoney`).
+- `/app/groups/[id]`: same button + modal on statement entries when `e.khqr` (uses
+  `e.remaining`, mirrors host pattern).
+- i18n ×4: `viewQrBtn`, `qrModalTitle`, `qrModalDesc`, `qrModalAmount`, `qrModalCycle`, `closeBtn`
+  in `types.ts` + en/vi/km/zh (host + member sections). `<img>` avoided — `next/image unoptimized`
+  (ephemeral blob URL) keeps eslint warning-free.
+
+### 23.4 Verification
+- `KhqrTests` (10 new): golden CRC; generator layout/ref; VND/USD/KHR/THB amount rendering per
+  exponent; unsupported currency rejected; tamper rejected (bad CRC + altered amount); debts carry
+  khqr reflecting remaining after partial pay-out; statement carries khqr only for unpaid IN
+  obligations; render scope matrix (host 200, member own share 200, cross-owner 404, other member
+  404, anon 401); disabled setting → no khqr anywhere + render 404, re-enable restores. Helpers:
+  `tagValue`, `billReference` (TLV walk, tag 62 → sub 01), `memberIdsOf` via `/shares`, `putSetting`,
+  `settledCycle` fixture (backdate `due_at`).
+- `mvn test` → **206 tests, 0 failures** (196 + 10); web `eslint` + `tsc --noEmit` clean (0
+  warnings); zero-float grep gate green. Nothing committed (standing rule); Docker stack left running.
+
+### 23.5 Decisions
+- `direction` semantics locked: CONTRIBUTION = `IN` (owed → QR), PAYOUT = `OUT` (never QR — payout
+  to winner is not a debt).
+- Members derived from `/shares` `memberProfileId` (no `/groups/{id}/members` route exists).
+- Display-only QR: money flows never read back from a scanned QR.
+
+## 24. Telegram per-host chat + events + daily due-digest (Step 35, 2026-10-09)
+
+### 24.1 Doc gate (BEFORE code)
+- `02-ARCHITECTURE.md` — module tree gains `telegram`; `owner_accounts` §4 adds
+  `telegram_chat_id BIGINT NULL (V17, Step 35)`; new "## Telegram (Step 35)" contract: host-only
+  channel (members never messaged via Telegram; in-app feed stays the member channel), TELEGRAM
+  settings keys, endpoints, event matrix, digest job rules, failure semantics; frontend pages add
+  `/host/telegram`.
+- `01-DOMAIN.md` **§17 "Telegram (Step 35)"** — host-only, two message kinds (event pings + daily
+  digest), settings gates (events default on, digest opt-in off), sync best-effort delivery that
+  NEVER throws into a financial op, money untouched.
+- `06-SETTINGS-TEMPLATES-RISK.md` §8 Telegram notes + §10 decision log 2026-10-09.
+
+### 24.2 Backend
+- `V17__telegram.sql`: `ALTER TABLE owner_accounts ADD COLUMN telegram_chat_id BIGINT` (nullable,
+  no FK — third-party id). `OwnerAccount.telegramChatId` + getter/setter;
+  `OwnerAccountRepository.findByTelegramChatIdIsNotNull()`.
+- `SettingsCatalog` TELEGRAM category (5th): `telegram_bot_token` (SECRET, ""),
+  `telegram_events_enabled` (BOOLEAN, true), `telegram_daily_digest_enabled` (BOOLEAN, false),
+  `telegram_daily_digest_time` (STRING, "08:00"). `AdminSettingsTests` 4→5 categories.
+- `com.tongtin.telegram`:
+  - `TelegramClient` interface + `BotApiTelegramClient` (`java.net.http.HttpClient`, 10s timeout,
+    blank-token short-circuit, never throws — mirrors PayWayService), ObjectMapper — no new dep.
+  - `TelegramNotifier` — best-effort, synchronous send after the business write in the same
+    `@Transactional` method; gates: events enabled + bot token + linked chat id; guards everything
+    so a send can never roll back a financial op (same invariant as `NotificationService`).
+  - `TelegramMessages` — pure VN composition (cycleOpened / winnerPublished / payoutConfirmed /
+    groupCompleted / paymentRecorded / lateFeesAssessed / testPing / dailyDigest), `fmt` uses
+    long-only decimal math (07-MULTI-CURRENCY §10 exponents), VND → " đ". No PII in digest.
+  - `TelegramService` — status / set-chat-id (null clears; positive-long validated; audits
+    TELEGRAM_LINKED / TELEGRAM_UNLINKED) / test-send (400 without chat id or without bot token;
+    audits TELEGRAM_TEST).
+  - `TelegramDigestJob` — `@Scheduled(cron = "0 * * * * *")` every minute; `runEveryMinute()` only
+    calls `process(Instant)` when the current minute == configured `HH:mm`; `process()` gates on
+    digest enabled + token; per host with `telegram_chat_id`, sums overdue IN obligations per group
+    (remaining after allocations) → one consolidated message. Digest only *announces* — never money.
+- Endpoints `GET /api/v1/host/telegram`, `PUT /api/v1/host/telegram/chat-id`,
+  `POST /api/v1/host/telegram/test` — `@PreAuthorize("hasRole('HOST')")`, own-account only.
+- Event hooks (all inside the transactional mutation, synchronous): CycleService CYCLE_OPENED;
+  CycleCloseService WINNER_PUBLISHED, PAYOUT_CONFIRMED, GROUP_COMPLETED (last cycle);
+  PaymentService.notifyPayerMembers PAYMENT_RECORDED (amount + payer count);
+  LateFeeService LATE_FEE_ASSESSED (total fee + affected count).
+
+### 24.3 Web
+- `lib/api.ts`: `getTelegramStatus`, `setTelegramChatId`, `testTelegram` (+ shared status type).
+- New `/host/telegram` page: chat-id input (numeric-only) → Save (PUT) / Clear (confirm) with
+  transient notices; Test-send button gated on `linked && eventsConfigured`; read-only status card
+  (events / digest / digest time / bot token); auth guard + retry pattern like host dashboard.
+- Host navbar gains "Telegram" item (`Send` icon, sky accent).
+- i18n ×4: `navbar.telegram` + full `telegramChannel` block in `types.ts` + en/vi/km/zh.
+
+### 24.4 Verification
+- `TelegramTests` (7 new, hermetic — `@MockBean TelegramClient` capture, ZERO network; every test
+  cleans its own rows): link/unlink round-trip + TELEGRAM_LINKED/TELEGRAM_UNLINKED audit rows;
+  member-scope 403 / anon 401 / negative chat-id 400; test-send gating (no chat → 400, no token →
+  400, ok → captured "Kiểm tra Telegram", client-failure → 400); daily digest covers ONLY the group
+  with owed obligations ("2 khoản — 1.600.000 đ"), disabled → no-op; full lifecycle events reach
+  host (mở KỲ → thắng ký → thanh toán); final-cycle payout raises GROUP_COMPLETED (2-cycle group);
+  payment-recorded + late-fee-assessed pings.
+- `mvn test` → **213 tests, 0 failures** (206 + 7); web `eslint` + `tsc --noEmit` clean (0
+  warnings); zero-float grep gate green. Nothing committed (standing rule); Docker stack left running.
+
+### 24.5 Decisions
+- Host-only channel: members keep the in-app feed; Telegram is for the host's bookkeeping flow.
+- Synchronous best-effort sends (no outbox/queue): simple, testable, and Step 14's "sync
+  transitions only" is respected — the digest announces totals but never triggers money movement.
+- Bot token is admin-owned and SECRET; a blank token short-circuits everything to zero network.
+- `telegram_bot_token` in tests is written straight to `system_settings` (catalog default governs
+  every other toggle); first `@MockBean` in the repo (spring-boot-starter-test available) used to
+  keep the suite offline — no api.telegram.org traffic, ever.
+
+## 25. Quick-pay single-step settlement (Step 36, 2026-10-09)
+
+### 25.1 Doc gate (BEFORE code)
+- `02-ARCHITECTURE.md` §5 — new "Quick-pay (Step 36)" contract under Payments: host-only
+  `POST /groups/{id}/quick-pay`, request shape, auto-allocation order, fail-fast errors, and the
+  note that receipt attach reuses `POST /payments/{id}/attachments`.
+- `01-DOMAIN.md` **§18 "Quick-pay (Step 36)"** — candidate pool (member's UNPAID/PARTIAL
+  direction-IN rows incl. LATE_FEE unless opted out), allocation order + equality with POST
+  /payments, fail-fast guarantees, receipt stays a separate step.
+- `06-SETTINGS-TEMPLATES-RISK.md` §11 decision log 2026-10-09.
+
+### 25.2 Backend
+- `LedgerEntryRepository.findOutstandingForMember` — member's UNPAID/PARTIAL `direction='IN'`
+  rows for a group `ORDER BY due_at, id` (plan §20 tie-break: oldest due first, then entry id).
+- `QuickPayRequest` DTO `{memberProfileId, amountMinor, currency, method?, paidAt?, note?,
+  allocateLateFees?}` (method defaults CASH, allocateLateFees defaults true).
+- `PaymentService` refactor that SHARES internals: the body of `record()` extracted into a private
+  `recordCore(...)` (currency match, sum/overflow/duplicate-entry checks, pessimistic locking,
+  payment+allocation save, notifyPayerMembers, audit, attachment metadata) — `record()` and
+  `quickPay()` both delegate; `autoAllocated` boolean surfaced in the audit payload
+  (`false` for manual POST /payments, `true` for quick-pay).
+- `planQuickPay(group, request)` — validates membership (`countByGroupIdAndMemberProfileId`), runs
+  the pool (LATE_FEE opt-out filter), rejects `amountMinor` above the member's total remaining,
+  and emits allocations `min(remaining, leftover)` in pool order (sum exact by construction).
+- `quickPay(userId, ownerId, groupId, request, key)` + controller `POST /groups/{id}/quick-pay`
+  (HOST, own group; `Idempotency-Key` header, same semantics as /payments:
+  `findQuickPayReplay` → 200, else 201; replay matches stored allocations' member + amount +
+  currency + method → 409 otherwise). Fail-fast: member not in group → 404; nothing outstanding →
+  400; over-pay → 400 (no writes on failure).
+- `PaymentController.quickPay` endpoint added (HOST-only).
+
+### 25.3 Web
+- `lib/api.ts`: `quickPay(groupId, body, idempotencyKey?)` → `{ id }`.
+- Host group page payments tab: "Quick-pay" button opens a modal (blazing Zap accent) — member
+  picker (derived per-member totals from debts), amount defaulted to the member's total remaining,
+  method select, optional note, optional receipt file (uploaded to the saved payment via the
+  existing `uploadPaymentAttachment` after the quick-pay succeeds), auto-allocation hint, submit →
+  reload.
+- i18n ×4: `hostGroupDetail` gains `quickPayBtn`, `quickPayModalTitle`, `quickPayMemberLabel`,
+  `quickPayMemberTotal`, `quickPayAmountLabel`, `quickPayNoteLabel`, `quickPayReceiptLabel`,
+  `quickPayAllocatesHint`, `quickPaySubmitBtn`, `msgQuickPaySuccess`.
+
+### 25.4 Verification
+- `QuickPayTests` (11 new, hermetic): auto-allocation includes LATE_FEE (contribution paid before
+  its same-due-at fee via entry-id tie-break; audit `autoAllocated: true`; only the other member's
+  debts remain); opt-out leaves the fee UNPAID; oldest-first across two settled cycles (older
+  contribution paid, newer untouched); partial single-split marks PARTIAL; over-pay → 400 with no
+  writes; no-outstanding (winner's PAYOUT never auto-paid) → 400; member-not-in-group → 404;
+  cross-owner → 404 + anon 401; idempotency replay 200 (same payment) + different-payload 409;
+  input validation (amount 0/missing/null member 400, currency mismatch 409, bad method 400);
+  quick-pay then receipt upload appears in payment history.
+- `mvn test` → **224 tests, 0 failures** (213 + 11); web `eslint` + `tsc --noEmit` clean (0
+  warnings); zero-float grep gate green. Nothing committed (standing rule); Docker stack left running.
+
+### 25.5 Decisions
+- Quick-pay is a normal `payments` row — same core path as POST /payments (locking, replay,
+  notifications, Telegram PAYMENT_RECORDED ping, audit); only the allocation *origin* differs
+  (`autoAllocated: true`).
+- The backend, not the host, chooses which obligations get paid (oldest due first, entry-id ties).
+- Receipt attach is NOT part of the quick-pay JSON: the UI attaches right after via the existing
+  attachment endpoint (kept the API shape clean; identical server behavior).
+
+## 26. Wrap-up — full docs pass, suite + build + Docker click-through, close-out (Step 37, 2026-10-09)
+
+### 26.1 Full docs pass
+- `README.md` (Khmer) + `README_VN.md` (Vietnamese) de-staled to the actual 2026-10-09 state:
+  - Tests badges `184` → **224** passed; body + sample output updated to 224.
+  - "14 Flyway Migrations (V1 -> V14)" → **17 (V1 -> V17)** (tree + quickstart).
+  - "13 routes" → **14** (tree + build line `14/14`).
+  - Module tree gains the Phase 2 packages: `attachments/` (BYTEA receipts, V15),
+    `khqr/` (EMVCo + zxing), `telegram/` (chat-id per host, digest job, V17).
+  - Roadmap section re-titled "37 giai đoạn / 37 steps" and rows **32–37** appended (attachments,
+    blacklist+status, KHQR, Telegram, quick-pay, wrap-up).
+- `03-BUILD-ROADMAP.md`: fixed stale row 31 (`⟳` → `✅`, superseded) and appended a **Phase 2
+  track — Steps 32–37** completed table (see roadmap file).
+- `plan.md` §0 status rows 36–37 added; §20 roadmap table row 37 → ✅; overall phase → `complete`.
+- `STATUS.md` closed out (done row 37, `CURRENT_STEP` → `DONE`, Phase 2 acceptance; demo-fixture
+  block retained for reference).
+
+### 26.2 Final suite + build
+- `mvn -o package` → **BUILD SUCCESS**: full hermetic suite **224 tests, 0 failures** (flyway
+  V1→V17 from scratch on a fresh postgres:16 Testcontainers container), fat jar built + repackaged
+  (`target/tongtin-api-0.0.1-SNAPSHOT.jar`); zero-float grep gate green.
+- Web `npm run build` → **14/14 routes** compiled (Next.js production build, all pages OK);
+  `eslint` + `tsc --noEmit` clean.
+
+### 26.3 Docker compose click-through
+- `docker compose up -d --build`: all three images built (api maven multi-stage, web standalone).
+- Healthcheck-gated startup: `tongtin-postgres` healthy → `tongtin-api` healthy →
+  `tongtin-web` healthy (all `(healthy)` in `docker compose ps`).
+- Live probes: `GET /api/v1/health` → **200**; `GET /login` (web) → **200**; unauthenticated
+  `GET /api/v1/groups` → **401** (auth guard active). Stack left RUNNING.
+
+### 26.4 Decisions / notes
+- No code changed during wrap-up — docs-only + verification/close-out (matches row 37 "—").
+- Nothing committed (standing rule). Repo is complete: Steps 00–37 ✅.
+- Parked P-items (incl. P2 PDF print templates) and §7.5 formula reminders (ranks 6–7) remain
+  open user-gated items, unchanged.
