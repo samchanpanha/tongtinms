@@ -4,7 +4,7 @@
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.5-brightgreen.svg)](https://spring.io/projects/spring-boot)
 [![Next.js](https://img.shields.io/badge/Next.js-16.3-black.svg)](https://nextjs.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://www.postgresql.org/)
-[![Tests](https://img.shields.io/badge/Tests-224%20passed-success.svg)](#testing--verification)
+[![Tests](https://img.shields.io/badge/Tests-230%20passed-success.svg)](#testing--verification)
 [![License](https://img.shields.io/badge/License-Proprietary-lightgrey.svg)]()
 
 > **វេទិកាគ្រប់គ្រងហ៊ុយ / ហ៊ុយ (ROSCA — Rotating Savings and Credit Association) ទំនើប តម្លាភាព និងសុវត្ថិភាព** ដែលត្រូវបានរចនាត្រឹមត្រូវតាមទំនៀមទម្លាប់ហិរញ្ញវត្ថុប្រពៃណីវៀតណាម និងស្តង់ដារអន្តរជាតិ។
@@ -176,7 +176,7 @@ docker compose down
 ## 🧪 ការសាកល្បង និងការធានាគុណភាព (Testing & Verification)
 
 ### ការសាកល្បង Backend (JUnit 5 + Spring Boot Test + Testcontainers)
-ប្រព័ន្ធ backend ទាំងមូលត្រូវបានគ្របដណ្តប់ដោយ **224 ការសាកល្បងដោយស្វ័យប្រវត្តិ** រួមមានការសាកល្បងគណិតវិទ្យាគែម, ម៉ាទ្រីសបែងចែកសិទ្ធិឆ្លងកាត់ tenant, ការសាកល្បងការប្រកួតប្រជែង និងការសាកល្បងនាំចេញឯកសារ CSV/XLSX។
+ប្រព័ន្ធ backend ទាំងមូលត្រូវបានគ្របដណ្តប់ដោយ **230 ការសាកល្បងដោយស្វ័យប្រវត្តិ** រួមមានការសាកល្បងគណិតវិទ្យាគែម, ម៉ាទ្រីសបែងចែកសិទ្ធិឆ្លងកាត់ tenant, ការសាកល្បងការប្រកួតប្រជែង និងការសាកល្បងនាំចេញឯកសារ CSV/XLSX។
 
 ចាប់ពី **ជំហានទី 28 (ថ្ងៃទី 08 ខែតុលា ឆ្នាំ 2026)** សំណុំសាកល្បងដំណើរការ **hermetic** ដោយប្រើ Testcontainers៖ រាល់ពេលដែលដំណើរការ `mvn test`
 នឹងចាប់ផ្តើមកុងតឺន័រ `postgres:16` ដាច់ដោយឡែក (Flyway migrate ទាំងមូលគ្រោងការណ៍ពីដើម) —
@@ -188,7 +188,7 @@ mvn test
 ```
 ```
 [INFO] Results:
-[INFO] Tests run: 224, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 230, Failures: 0, Errors: 0, Skipped: 0
 [INFO] BUILD SUCCESS
 ```
 

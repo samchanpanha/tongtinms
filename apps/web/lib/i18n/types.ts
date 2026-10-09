@@ -592,6 +592,7 @@ export interface Translations {
   subscription: {
     title: string;
     subtitle: string;
+    disabledNotice: string;
     statusCardTitle: string;
     statusTrial: string;
     statusActive: string;

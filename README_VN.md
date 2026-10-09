@@ -4,7 +4,7 @@
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.5-brightgreen.svg)](https://spring.io/projects/spring-boot)
 [![Next.js](https://img.shields.io/badge/Next.js-16.3-black.svg)](https://nextjs.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://www.postgresql.org/)
-[![Tests](https://img.shields.io/badge/Tests-224%20passed-success.svg)](#testing--verification)
+[![Tests](https://img.shields.io/badge/Tests-230%20passed-success.svg)](#testing--verification)
 [![License](https://img.shields.io/badge/License-Proprietary-lightgrey.svg)]()
 
 > **Nền tảng quản lý Hụi / Hội (ROSCA — Rotating Savings and Credit Association) hiện đại, minh bạch và bảo mật**, thiết kế chuẩn xác theo tập quán tài chính truyền thống Việt Nam và thông lệ quốc tế.
@@ -176,7 +176,7 @@ Sau khi khởi động với `--seed`, bạn có thể truy cập các dịch v�
 ## 🧪 Kiểm Thử & Đảm Bảo Chất Lượng (Testing & Verification)
 
 ### Kiểm Thử Backend (JUnit 5 + Spring Boot Test + Testcontainers)
-Toàn bộ hệ thống backend được bao phủ bởi **224 ca kiểm thử tự động**, bao gồm kiểm thử toán học biên, ma trận phân quyền chéo tenant, kiểm thử tương tranh và kiểm thử xuất file CSV/XLSX.
+Toàn bộ hệ thống backend được bao phủ bởi **230 ca kiểm thử tự động**, bao gồm kiểm thử toán học biên, ma trận phân quyền chéo tenant, kiểm thử tương tranh và kiểm thử xuất file CSV/XLSX.
 
 Từ **Step 28 (2026-10-08)** bộ test chạy **hermetic** bằng Testcontainers: mỗi lần `mvn test`
 tự khởi động một container `postgres:16` cô lập (Flyway migrate toàn bộ schema từ đầu) —
@@ -188,7 +188,7 @@ mvn test
 ```
 ```
 [INFO] Results:
-[INFO] Tests run: 224, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 230, Failures: 0, Errors: 0, Skipped: 0
 [INFO] BUILD SUCCESS
 ```
 

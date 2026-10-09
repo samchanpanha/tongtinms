@@ -39,8 +39,18 @@ public class SubscriptionGuard {
         return settingsService.getBoolean("enforce_subscription", true);
     }
 
+    /**
+     * Master switch for the whole subscription subsystem (Step "disable/enable
+     * Subscription"): when OFF, enforcement is fully bypassed, hosts are treated
+     * as active, expiry/limit checks never block and checkout is refused
+     * elsewhere (SubscriptionService). Defaults to ON.
+     */
+    public boolean isSubscriptionEnabled() {
+        return settingsService.getBoolean("subscription_enabled", true);
+    }
+
     public void assertCanCreateGroup(Long ownerId) {
-        if (!isEnforcementEnabled()) {
+        if (!isSubscriptionEnabled() || !isEnforcementEnabled()) {
             return;
         }
 

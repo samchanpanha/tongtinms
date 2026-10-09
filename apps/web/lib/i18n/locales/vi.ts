@@ -555,6 +555,7 @@ export const vi: Translations = {
   subscription: {
     title: "Gói Dịch Vụ & Thanh Toán",
     subtitle: "Quản lý gói sử dụng dành cho Chủ Hụi, nâng cấp gói và thanh toán bảo mật tức thì qua ABA PayWay.",
+    disabledNotice: "Hệ thống gói sử dụng đang tạm dừng bởi quản trị viên. Mọi chủ hụi đang được dùng miễn phí. Thanh toán gói trực tuyến đang tạm ngưng.",
     statusCardTitle: "Trạng Thái Tài Khoản",
     statusTrial: "Dùng Thử Miễn Phí 1 Tháng",
     statusActive: "Đang Hoạt Động (Gói Trả Phí)",

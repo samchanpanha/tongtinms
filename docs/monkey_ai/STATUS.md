@@ -928,6 +928,11 @@ LAST_UPDATED: 2026-10-09
 done): suite **224** green + fat jar, web lint/tsc/build clean (14/14 routes), Docker compose
 stack healthy. No committed work (standing rule; user commits when ready).
 
+**Post-completion feature (2026-10-09, user-requested):** Subscription master switch
+`subscription_enabled` — admin config to disable/enable the whole subscription subsystem (guard
+bypass, ACTIVE status, checkout 400, lifecycle parked). See plan.md §27; suite now **230**,
+web clean.
+
 Open items remain user-gated only: §7.5 formula reminders (ranks 6–7) and parked P-items
 (incl. P2 PDF print templates).
 

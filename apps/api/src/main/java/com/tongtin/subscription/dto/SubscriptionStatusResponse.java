@@ -12,6 +12,7 @@ public record SubscriptionStatusResponse(
         boolean isTrial,
         boolean isGracePeriod,
         boolean isExpired,
+        boolean subscriptionEnabled, // master switch (subscription_enabled setting)
         boolean canCreateGroup,
         SubscriptionPlanDto currentPlan,
         long groupsCount,

@@ -9,5 +9,6 @@ public record PayWaySettingsDto(
         boolean enabled,
         int freeTrialDays,
         int gracePeriodDays,
-        boolean enforceSubscription
+        boolean enforceSubscription,
+        boolean subscriptionEnabled
 ) {}

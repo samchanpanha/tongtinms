@@ -59,7 +59,7 @@ public class SubscriptionLifecycleJob {
 
     @Transactional
     public Result process(Instant now) {
-        if (!subscriptionGuard.isEnforcementEnabled()) {
+        if (!subscriptionGuard.isSubscriptionEnabled() || !subscriptionGuard.isEnforcementEnabled()) {
             return new Result(0, 0);
         }
 

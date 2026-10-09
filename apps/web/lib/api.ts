@@ -761,6 +761,7 @@ export const api = {
     isTrial: boolean;
     isGracePeriod: boolean;
     isExpired: boolean;
+    subscriptionEnabled?: boolean;
     canCreateGroup: boolean;
     currentPlan: {
       id: number;

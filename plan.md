@@ -1327,3 +1327,41 @@ Complete-to-Do details live in `plan.md §21+` per step and `docs/monkey_ai/STAT
 - Nothing committed (standing rule). Repo is complete: Steps 00–37 ✅.
 - Parked P-items (incl. P2 PDF print templates) and §7.5 formula reminders (ranks 6–7) remain
   open user-gated items, unchanged.
+
+## 27. Subscription master switch — disable/enable the whole subscription system (post-close-out, 2026-10-09)
+
+User request after Step 37 close-out: "implement set configuration disable and enable Subscription".
+A global admin config knob `subscription_enabled` (BOOLEAN, default ON) is added to the existing
+SUBSCRIPTION settings category. No Flyway migration (catalog-declared, rows created on first save).
+
+### 27.1 Behavior while OFF
+- **Group creation** (`SubscriptionGuard.assertCanCreateGroup`): fully bypassed — no expiry check,
+  no plan-limit check, hosts always allowed.
+- **Host my-status** (`GET /subscription/my-status`): reports `subscriptionEnabled=false`,
+  `subscriptionStatus=ACTIVE`, `isExpired=false`, `canCreateGroup=true` even for an expired account
+  (raw account state untouched).
+- **Checkout** (`POST /subscription/checkout/payway`): refused with 400 "Hệ thống gói sử dụng đang
+  tạm dừng …", before any plan/order logic — no orders created.
+- **Lifecycle job** (`SubscriptionLifecycleJob.process`): parked, returns `Result(0,0)` — no
+  reminders, no auto-expiry writes.
+- **Admin PayWay settings** (`GET/PUT /admin/subscription/payway-settings`): round-trips the switch
+  (`subscriptionEnabled` field side by side with `enforceSubscription`).
+
+### 27.2 Places wired
+- `SettingsCatalog.java` SUBSCRIPTION category (new first key `subscription_enabled`) — admin UI
+  renders it automatically (catalog-driven settings tab).
+- `SubscriptionGuard.isSubscriptionEnabled()` + `assertCanCreateGroup` early return.
+- `SubscriptionService.getMyStatus` / `checkoutPayWay` / `getPayWaySettings` / `updatePayWaySettings`.
+- `SubscriptionStatusResponse` and `PayWaySettingsDto` gain `subscriptionEnabled`.
+- `SubscriptionLifecycleJob.process` skip.
+- Web: `api.ts` type; `/host/subscription` amber banner + plans/invoices sections hidden while OFF;
+  i18n `subscription.disabledNotice` ×4 (en/vi/km/zh).
+
+### 27.3 Verification
+- `SubscriptionEnabledToggleTests` (6 new, hermetic, `@Transactional`): default state is enabled;
+  disabled → expired host never blocked (vs Forbidden when enabled); my-status reports ACTIVE/
+  not-expired/canCreateGroup with the flag false; checkout refused 400 while OFF (ok when ON);
+  lifecycle job parked while OFF then expires once re-enabled; admin round-trip toggle persists via
+  `updatePayWaySettings` and generic settings update.
+- Full suite: `mvn -o test` → **230 tests, 0 failures** (224 + 6). Web `eslint` + `tsc --noEmit`
+  clean; `npm run build` 14/14. Zero-float grep gate green. Nothing committed (standing rule).

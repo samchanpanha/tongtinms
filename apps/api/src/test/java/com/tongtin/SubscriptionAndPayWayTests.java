@@ -322,7 +322,7 @@ public class SubscriptionAndPayWayTests {
 
         PayWaySettingsDto update = new PayWaySettingsDto(
                 "ec999999", "secret_hash_key_123456", "https://checkout.payway.com.kh/api/v1/purchase",
-                "https://checkout.payway.com.kh/api/v1/check", false, true, 30, 5, true);
+                "https://checkout.payway.com.kh/api/v1/check", false, true, 30, 5, true, true);
 
         PayWaySettingsDto result = subscriptionService.updatePayWaySettings(adminUserId, update);
         assertEquals("ec999999", result.merchantId());
@@ -346,7 +346,7 @@ public class SubscriptionAndPayWayTests {
     void testSimulatePaymentBlockedOutsideSandbox() throws Exception {
         subscriptionService.updatePayWaySettings(adminUserId, new PayWaySettingsDto(
                 payWayService.getMerchantId(), payWayService.getApiKey(), payWayService.getApiUrl(),
-                payWayService.getCheckUrl(), false, true, 30, 3, true));
+                payWayService.getCheckUrl(), false, true, 30, 3, true, true));
 
         SubscriptionPlanDto plan = subscriptionService.getActivePlans().get(0);
         PayWayCheckoutResponse checkout = subscriptionService.checkoutPayWay(
@@ -439,7 +439,7 @@ public class SubscriptionAndPayWayTests {
         // Enforcement switch off -> always allowed
         subscriptionService.updatePayWaySettings(adminUserId, new PayWaySettingsDto(
                 payWayService.getMerchantId(), payWayService.getApiKey(), payWayService.getApiUrl(),
-                payWayService.getCheckUrl(), true, true, 30, 3, false));
+                payWayService.getCheckUrl(), true, true, 30, 3, false, true));
         assertDoesNotThrow(() -> subscriptionGuard.assertCanCreateGroup(hostOwnerId));
     }
 
@@ -448,7 +448,7 @@ public class SubscriptionAndPayWayTests {
     void testSubscriptionLifecycleJob() {
         subscriptionService.updatePayWaySettings(adminUserId, new PayWaySettingsDto(
                 payWayService.getMerchantId(), payWayService.getApiKey(), payWayService.getApiUrl(),
-                payWayService.getCheckUrl(), true, true, 30, 3, true));
+                payWayService.getCheckUrl(), true, true, 30, 3, true, true));
 
         Instant now = Instant.now();
 
@@ -482,7 +482,7 @@ public class SubscriptionAndPayWayTests {
         // Enforcement switch off -> nothing is processed at all
         subscriptionService.updatePayWaySettings(adminUserId, new PayWaySettingsDto(
                 payWayService.getMerchantId(), payWayService.getApiKey(), payWayService.getApiUrl(),
-                payWayService.getCheckUrl(), true, true, 30, 3, false));
+                payWayService.getCheckUrl(), true, true, 30, 3, false, true));
         assertEquals(new SubscriptionLifecycleJob.Result(0, 0), lifecycleJob.process(now));
     }
 

@@ -42,6 +42,10 @@ public final class SettingsCatalog {
                     SettingDefinition.of("payments_khqr_enabled", PAYMENT, "Bật mã QR nghĩa vụ",
                             "Bật để mỗi khoản còn nợ có mã KHQR thanh toán (debts + statement)", SettingType.BOOLEAN, "true"))),
             new Category(SUBSCRIPTION, "Gói sử dụng", List.of(
+                    SettingDefinition.of("subscription_enabled", SUBSCRIPTION, "Bật hệ thống gói sử dụng",
+                            "Tắt để tạm dừng toàn bộ gói: chủ hụi dùng tự do (không chặn tạo dây hụi mới), "
+                                    + "tạm ngưng thanh toán gói; bật lại để áp dụng gói như bình thường",
+                            SettingType.BOOLEAN, "true"),
                     SettingDefinition.of("enforce_subscription", SUBSCRIPTION, "Bắt buộc gói",
                             "Bật để chặn tạo dây hụi mới khi gói hết hạn", SettingType.BOOLEAN, "true"),
                     SettingDefinition.numeric("free_trial_days", SUBSCRIPTION, "Số ngày dùng thử",

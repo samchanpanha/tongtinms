@@ -30,6 +30,7 @@ interface SubscriptionStatus {
   isTrial: boolean;
   isGracePeriod: boolean;
   isExpired: boolean;
+  subscriptionEnabled?: boolean;
   canCreateGroup: boolean;
   currentPlan: {
     id: number;
@@ -274,6 +275,14 @@ export default function HostSubscriptionPage() {
         </div>
       )}
 
+      {/* Subscription subsystem disabled by admin */}
+      {status && status.subscriptionEnabled === false && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-300 flex items-center gap-3">
+          <AlertTriangle className="h-5 w-5 shrink-0" />
+          <span>{t.subscription.disabledNotice}</span>
+        </div>
+      )}
+
       {/* ABA PayWay gateway return notices */}
       {returnNotice === "verifying" && (
         <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-800 dark:border-sky-900/50 dark:bg-sky-950/40 dark:text-sky-300 flex items-center gap-3">
@@ -394,7 +403,8 @@ export default function HostSubscriptionPage() {
       )}
 
       {/* Subscription Plans Selection */}
-      <div className="space-y-6">
+      {(!status || status.subscriptionEnabled !== false) && (
+        <div className="space-y-6">
         <div>
           <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50 flex items-center gap-2">
             <CreditCard className="h-5 w-5 text-emerald-600" />
@@ -481,9 +491,11 @@ export default function HostSubscriptionPage() {
             );
           })}
         </div>
-      </div>
+        </div>
+      )}
 
       {/* Invoice History */}
+      {(!status || status.subscriptionEnabled !== false) && (
       <div className="space-y-4 pt-4 border-t border-zinc-200 dark:border-zinc-800">
         <div className="flex items-center gap-2">
           <Receipt className="h-5 w-5 text-zinc-600 dark:text-zinc-400" />
@@ -543,6 +555,7 @@ export default function HostSubscriptionPage() {
           </div>
         )}
       </div>
+      )}
 
       {/* ABA PayWay Checkout Modal */}
       {selectedPlan && (

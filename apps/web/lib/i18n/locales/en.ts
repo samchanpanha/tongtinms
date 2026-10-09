@@ -555,6 +555,7 @@ export const en: Translations = {
   subscription: {
     title: "Subscription & Billing",
     subtitle: "Manage your host subscription, upgrade plans, and pay securely via ABA PayWay.",
+    disabledNotice: "Subscriptions are globally disabled by the administrator. All hosts are currently using the service free of charge. Online payment for plans is paused.",
     statusCardTitle: "Subscription Status",
     statusTrial: "1-Month Free Trial Active",
     statusActive: "Active Paid Subscription",

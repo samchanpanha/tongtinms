@@ -91,6 +91,8 @@ public class SubscriptionService {
         OwnerAccount owner = ownerAccountRepository.findById(ownerId)
                 .orElseThrow(() -> new NotFoundException("Owner account not found"));
 
+        boolean subscriptionEnabled = settingsService.getBoolean("subscription_enabled", true);
+
         Instant now = Instant.now();
         Instant endsAt = owner.getSubscriptionEndsAt() != null ? owner.getSubscriptionEndsAt() : now;
         Instant trialEnd = owner.getTrialEndsAt() != null ? owner.getTrialEndsAt() : now;
@@ -105,6 +107,14 @@ public class SubscriptionService {
         boolean isTrial = "TRIAL".equalsIgnoreCase(owner.getSubscriptionStatus()) && now.isBefore(trialEnd);
         boolean isGracePeriod = !isLifetime && now.isAfter(endsAt) && now.isBefore(graceEnd);
         boolean isExpired = !isLifetime && now.isAfter(graceEnd);
+
+        // When the subscription subsystem is switched OFF, the host is effectively
+        // ACTIVE and never blocked; the raw expiry/plan state stays on the account.
+        if (!subscriptionEnabled) {
+            isTrial = false;
+            isGracePeriod = false;
+            isExpired = false;
+        }
 
         String effectiveStatus = isLifetime ? "LIFETIME" :
                 (isExpired ? "EXPIRED" : (isGracePeriod ? "GRACE_PERIOD" : (isTrial ? "TRIAL" : "ACTIVE")));
@@ -127,6 +137,9 @@ public class SubscriptionService {
         }
 
         boolean canCreateGroup = !isExpired && (maxGroups < 0 || groupsCount < maxGroups);
+        if (!subscriptionEnabled) {
+            canCreateGroup = true;
+        }
 
         return new SubscriptionStatusResponse(
                 owner.getId(),
@@ -138,6 +151,7 @@ public class SubscriptionService {
                 isTrial,
                 isGracePeriod,
                 isExpired,
+                subscriptionEnabled,
                 canCreateGroup,
                 currentPlanDto,
                 groupsCount,
@@ -223,6 +237,11 @@ public class SubscriptionService {
     @Transactional
     public PayWayCheckoutResponse checkoutPayWay(Long userId, Long ownerId, PayWayCheckoutRequest req,
             String requestOrigin) {
+        if (!settingsService.getBoolean("subscription_enabled", true)) {
+            throw new BadRequestException(
+                    "Hệ thống gói sử dụng đang tạm dừng. Vui lòng quay lại sau. / Subscription system is currently disabled.");
+        }
+
         SubscriptionPlan plan = planRepository.findById(req.planId())
                 .orElseThrow(() -> new NotFoundException("Subscription plan not found"));
 
@@ -701,7 +720,8 @@ public class SubscriptionService {
                 payWayService.isEnabled(),
                 settingsService.getInt("free_trial_days", 30),
                 settingsService.getInt("grace_period_days", 3),
-                settingsService.getBoolean("enforce_subscription", true)
+                settingsService.getBoolean("enforce_subscription", true),
+                settingsService.getBoolean("subscription_enabled", true)
         );
     }
 
@@ -717,6 +737,7 @@ public class SubscriptionService {
         values.put("free_trial_days", String.valueOf(dto.freeTrialDays()));
         values.put("grace_period_days", String.valueOf(dto.gracePeriodDays()));
         values.put("enforce_subscription", String.valueOf(dto.enforceSubscription()));
+        values.put("subscription_enabled", String.valueOf(dto.subscriptionEnabled()));
         settingsService.update(adminUserId, values);
         return getPayWaySettings();
     }

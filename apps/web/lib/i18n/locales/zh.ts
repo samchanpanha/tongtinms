@@ -553,6 +553,7 @@ export const zh: Translations = {
   subscription: {
     title: "服务套餐与结算中心",
     subtitle: "管理会头服务套餐，升级计划并通过 ABA PayWay 安全即时支付。",
+    disabledNotice: "系统服务套餐已被管理员全局停用。当前所有会头均可免费使用服务。在线购买套餐已暂停。",
     statusCardTitle: "账户状态",
     statusTrial: "1个月免费试用生效中",
     statusActive: "已激活 (付费套餐)",
