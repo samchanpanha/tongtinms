@@ -29,9 +29,21 @@ public class ReportController {
         this.exportService = exportService;
     }
 
+    /**
+     * Step 42: optional filters cycleId / type / status + pagination (page 0-based, size default 50).
+     * When page param is omitted (defaults to -1) the full unpaginated response is returned (backward-compat).
+     */
     @GetMapping("/groups/{id}/ledger")
     public LedgerReportResponse ledger(@AuthenticationPrincipal AuthPrincipal principal,
-                                       @PathVariable Long id) {
+                                       @PathVariable Long id,
+                                       @RequestParam(required = false) Long cycleId,
+                                       @RequestParam(required = false) String type,
+                                       @RequestParam(required = false) String status,
+                                       @RequestParam(defaultValue = "-1") int page,
+                                       @RequestParam(defaultValue = "50") int size) {
+        if (page >= 0) {
+            return reportService.ledgerPaged(principal.ownerId(), id, cycleId, type, status, page, size);
+        }
         return reportService.ledger(principal.ownerId(), id);
     }
 

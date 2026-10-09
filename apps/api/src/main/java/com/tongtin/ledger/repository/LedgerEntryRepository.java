@@ -5,6 +5,8 @@ import jakarta.persistence.LockModeType;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
@@ -95,4 +97,22 @@ public interface LedgerEntryRepository extends JpaRepository<LedgerEntry, Long> 
 
     @Query("SELECT e.status FROM LedgerEntry e WHERE e.id = :id")
     Optional<String> findStatusById(@Param("id") Long id);
+
+    /**
+     * Step 42: Paginated + filtered ledger entries.
+     * All filter params are optional (pass null to ignore).
+     */
+    @Query("""
+            SELECT e FROM LedgerEntry e
+            WHERE e.groupId = :groupId
+              AND (:cycleId IS NULL OR e.cycleId = :cycleId)
+              AND (:type IS NULL OR e.type = :type)
+              AND (:status IS NULL OR e.status = :status)
+            ORDER BY e.cycleId, e.shareId NULLS LAST, e.id
+            """)
+    Page<LedgerEntry> findByGroupIdFiltered(@Param("groupId") Long groupId,
+                                            @Param("cycleId") Long cycleId,
+                                            @Param("type") String type,
+                                            @Param("status") String status,
+                                            Pageable pageable);
 }

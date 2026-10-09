@@ -68,8 +68,11 @@ public class JwtService {
         }
         Long userId = Long.valueOf(claims.getSubject());
         Long ownerId = claims.get("ownerId", Long.class);
-        List<String> roles = claims.get("roles", List.class);
-        return new AuthPrincipal(userId, ownerId, roles == null ? List.of() : roles);
+        Object rawRoles = claims.get("roles");
+        List<String> roles = rawRoles instanceof List<?> list
+                ? list.stream().map(Object::toString).toList()
+                : List.of();
+        return new AuthPrincipal(userId, ownerId, roles);
     }
 
     public AuthPrincipal parseRefresh(String token) throws JwtException {
@@ -83,8 +86,11 @@ public class JwtService {
         }
         Long userId = Long.valueOf(claims.getSubject());
         Long ownerId = claims.get("ownerId", Long.class);
-        List<String> roles = claims.get("roles", List.class);
-        return new AuthPrincipal(userId, ownerId, roles == null ? List.of() : roles);
+        Object rawRoles = claims.get("roles");
+        List<String> roles = rawRoles instanceof List<?> list
+                ? list.stream().map(Object::toString).toList()
+                : List.of();
+        return new AuthPrincipal(userId, ownerId, roles);
     }
 
     private String token(String type, Long userId, Long ownerId, List<String> roles, Duration ttl) {

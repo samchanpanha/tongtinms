@@ -20,6 +20,7 @@ import {
   Download,
   QrCode,
   X,
+  Clock,
 } from "lucide-react";
 
 type MyGroup = Awaited<ReturnType<typeof api.getMyGroups>>[number];
@@ -236,12 +237,20 @@ export default function MemberGroupDetailPage({
           {/* Active Bidding Box */}
           {activeBiddingCycle && (
             <div className="rounded-2xl border border-amber-500/30 bg-amber-50/50 p-6 dark:bg-amber-950/20">
-              <div className="flex items-center gap-2 text-amber-900 dark:text-amber-200 text-sm font-bold">
-                <Lock className="h-4 w-4 text-amber-600" />
-                {t.memberGroupDetail.activeBiddingTitle(activeBiddingCycle.cycleNo)}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div className="flex items-center gap-2 text-amber-900 dark:text-amber-200 text-sm font-bold">
+                  <Lock className="h-4 w-4 text-amber-600" />
+                  {t.memberGroupDetail.activeBiddingTitle(activeBiddingCycle.cycleNo)}
+                </div>
+                {activeBiddingCycle.bidCloseAt && (
+                  <div className="inline-flex items-center gap-1.5 rounded-full bg-amber-100/90 px-2.5 py-0.5 text-xs font-semibold text-amber-900 dark:bg-amber-900/60 dark:text-amber-200">
+                    <Clock className="h-3 w-3" />
+                    Hạn chót: {formatDateTime(activeBiddingCycle.bidCloseAt, language)}
+                  </div>
+                )}
               </div>
               <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
-                {t.memberGroupDetail.activeBiddingDesc}
+                {t.memberGroupDetail.activeBiddingDesc} • Bỏ giá kín bảo mật, hệ thống chỉ tiết lộ giá khi chủ hội mở kết quả.
               </p>
 
               {bidError && (

@@ -1,11 +1,44 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useLanguage } from "@/lib/i18n";
+import { getStoredAuth, getStoredToken } from "@/lib/api";
 import { Users, Coins, ArrowRight, Lock, FileSpreadsheet, Sparkles } from "lucide-react";
 
 export default function Home() {
   const { t } = useLanguage();
+  const router = useRouter();
+  const [checkingAuth, setCheckingAuth] = useState(true);
+
+  useEffect(() => {
+    const token = getStoredToken();
+    const auth = getStoredAuth();
+    if (token && auth) {
+      if (auth.roles?.includes("HOST")) {
+        router.replace("/host");
+        return;
+      }
+      if (auth.roles?.includes("MEMBER")) {
+        router.replace("/app");
+        return;
+      }
+      if (auth.roles?.includes("ADMIN")) {
+        router.replace("/admin");
+        return;
+      }
+    }
+    setCheckingAuth(false);
+  }, [router]);
+
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
+      </div>
+    );
+  }
 
   return (
     <div className="relative isolate overflow-hidden">

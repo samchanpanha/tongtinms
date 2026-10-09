@@ -114,7 +114,7 @@ public class CycleService {
     public CycleResponse get(Long ownerId, Long cycleId) {
         Cycle cycle = cycleRepository.findById(cycleId)
                 .orElseThrow(() -> new NotFoundException("Cycle not found"));
-        Group group = findGroup(ownerId, cycle.getGroupId());
+        findGroup(ownerId, cycle.getGroupId());
         return CycleResponse.from(cycle);
     }
 

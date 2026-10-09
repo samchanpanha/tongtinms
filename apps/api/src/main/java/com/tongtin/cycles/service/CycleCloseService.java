@@ -24,6 +24,7 @@ import com.tongtin.telegram.TelegramNotifier;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
@@ -86,16 +87,32 @@ public class CycleCloseService {
 
         GroupShare winner;
         long winningBid;
-        if ("BIDDING".equals(status)) {
+        String winnerMode;
+
+        if ("BIDDING".equals(status) && request != null && request.isRandomEqualMax()) {
+            // Step 40: Random draw — pick any ALIVE share uniformly, winning bid = group.maxBid
+            List<GroupShare> alive = shares.stream()
+                    .filter(s -> "ALIVE".equals(s.getStatus()))
+                    .toList();
+            if (alive.isEmpty()) {
+                throw new BadRequestException("No ALIVE shares available for random draw");
+            }
+            int idx = ThreadLocalRandom.current().nextInt(alive.size());
+            winner = alive.get(idx);
+            winningBid = group.getMaxBid();
+            winnerMode = "RANDOM_EQUAL_MAX";
+        } else if ("BIDDING".equals(status)) {
             Bid winning = pickBiddingWinner(cycle, group, shares, request);
             winner = shareById(shares, winning.getShareId());
             winningBid = winning.getAmountMinor();
+            winnerMode = "HIGHEST_BID";
         } else {
             winner = shares.stream()
                     .filter(s -> "ALIVE".equals(s.getStatus()))
                     .min(java.util.Comparator.comparingInt(GroupShare::getShareNo))
                     .orElseThrow(() -> new BadRequestException("No ALIVE share left to receive the pot"));
             winningBid = 0L;
+            winnerMode = "FIXED";
         }
 
         int n = shares.size();
@@ -154,6 +171,7 @@ public class CycleCloseService {
                 Map.of("cycleNo", cycle.getCycleNo(),
                         "winnerShareId", winner.getId(),
                         "winningBid", winningBid,
+                        "winnerMode", winnerMode,
                         "grossPot", result.grossPot(),
                         "hostFee", result.T(),
                         "netPayout", result.netPayout(),

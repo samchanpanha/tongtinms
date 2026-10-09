@@ -3,9 +3,11 @@ package com.tongtin.ledger.payments.web;
 import com.tongtin.common.security.AuthPrincipal;
 import com.tongtin.ledger.dto.LateFeeAssessResponse;
 import com.tongtin.ledger.payments.dto.DebtResponse;
+import com.tongtin.ledger.payments.dto.InvoiceResponse;
 import com.tongtin.ledger.payments.dto.PaymentCreateRequest;
 import com.tongtin.ledger.payments.dto.PaymentResponse;
 import com.tongtin.ledger.payments.dto.QuickPayRequest;
+import com.tongtin.ledger.payments.service.InvoiceService;
 import com.tongtin.ledger.payments.service.PaymentService;
 import com.tongtin.ledger.service.LateFeeService;
 import jakarta.validation.Valid;
@@ -29,10 +31,13 @@ public class PaymentController {
 
     private final PaymentService paymentService;
     private final LateFeeService lateFeeService;
+    private final InvoiceService invoiceService;
 
-    public PaymentController(PaymentService paymentService, LateFeeService lateFeeService) {
+    public PaymentController(PaymentService paymentService, LateFeeService lateFeeService,
+                             InvoiceService invoiceService) {
         this.paymentService = paymentService;
         this.lateFeeService = lateFeeService;
+        this.invoiceService = invoiceService;
     }
 
     @PostMapping("/groups/{id}/payments")
@@ -77,5 +82,13 @@ public class PaymentController {
     public ResponseEntity<LateFeeAssessResponse> assessLateFees(@AuthenticationPrincipal AuthPrincipal principal,
                                                                 @PathVariable Long id) {
         return ResponseEntity.ok(lateFeeService.assess(principal.userId(), principal.ownerId(), id));
+    }
+
+    /** Step 38: Invoice JSON for a specific payment. */
+    @GetMapping("/groups/{id}/payments/{paymentId}/invoice")
+    public InvoiceResponse invoice(@AuthenticationPrincipal AuthPrincipal principal,
+                                   @PathVariable Long id,
+                                   @PathVariable Long paymentId) {
+        return invoiceService.invoice(principal.ownerId(), id, paymentId);
     }
 }

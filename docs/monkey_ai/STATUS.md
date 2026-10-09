@@ -1,7 +1,7 @@
 # STATUS
 
-CURRENT_STEP: DONE — Steps 00–37 complete
-CURRENT_STEP_TITLE: Wrap-up — full docs pass, suite + build + Docker click-through, close-out (plan.md row 37 / §26)
+CURRENT_STEP: DONE — Steps 00–42 complete
+CURRENT_STEP_TITLE: Phase 3 complete — Invoice, Member Bids, Random Equal-Max Winner, Logged-in Redirect, Report Pagination & Filtering
 PHASE: complete
 LAST_UPDATED: 2026-10-09
 
@@ -45,7 +45,13 @@ LAST_UPDATED: 2026-10-09
 - [x] Step 34 KHQR per obligation (Phase 2 #3) — real EMVCo CRC16-CCITT merchant-presented QR per unpaid obligation (`TONGTIN <code>-O<entryId>`), `khqr` on debts + statement rows, `payments_khqr_enabled` setting, PNG render endpoint (host own group / member own share, image/png), QR modal in host debts + member statement; suite **206 pass** — see acceptance below
 - [x] Step 35 Telegram per-host chat + cycle events + daily due-digest (Phase 2 #4) — `V17 owner_accounts.telegram_chat_id`, TELEGRAM settings category (bot token / events / digest toggle + time), host-only chat-id link + test-send, six event hooks (CYCLE_OPENED, WINNER_PUBLISHED, PAYOUT_CONFIRMED, GROUP_COMPLETED, PAYMENT_RECORDED, LATE_FEE_ASSESSED), every-minute gated digest job, hermetic suite (mock client, zero network); suite **213 pass** — see acceptance below
 - [x] Step 36 Quick-pay single-step settlement (Phase 2 #5) — `POST /groups/{id}/quick-pay`: host types a member + total, backend auto-allocates oldest-due-first (then entry id) across the member's UNPAID/PARTIAL direction-IN obligations incl. LATE_FEE (opt-out flag), runs the SHARED core of `PaymentService.record()` (`recordCore`, audit `autoAllocated`), normal `payments` row + idempotency replay; host UI modal with member totals + optional receipt attach; suite **224 pass** — see acceptance below
-- [x] Step 37 Wrap-up & close-out (Phase 2 #6) — full docs pass (README.md/README_VN.md de-staled to 224 tests / V1→V17 / 14 routes / Phase 2 module tree / 37-step roadmap; 03-BUILD-ROADMAP Phase 2 table + row-31 fix; plan.md §0 rows 36–37 + §26 record), final `mvn -o package` **BUILD SUCCESS** (suite 224/0, fat jar), `npm run build` 14/14 (lint/tsc clean), Docker compose rebuilt + click-through (postgres/api/web all healthy, api health 200, web /login 200, api auth 401); **Steps 00–37 complete, nothing committed** — see acceptance below
+- [x] Step 37 Wrap-up & close-out (Phase 2 #6) — full docs pass, final `mvn package` BUILD SUCCESS (suite 224/0), `npm run build` 14/14, Docker compose verified.
+- [x] Step 38 Payment Invoice — `GET /groups/{id}/payments/{paymentId}/invoice` JSON endpoint with issuer host bank info, payer member info, itemized obligation allocation lines; printable HTML invoice page at `/host/groups/[id]/payments/[pid]/invoice` with print CSS and browser PDF export; "Hoá đơn" link button in group payments tab.
+- [x] Step 39 Member Bids UI Polish — Sealed bidding UI in member portal (`/app/groups/[id]`) with deadline pill (`bidCloseAt`), confidentiality security badge, input validation, and clear submission confirmation.
+- [x] Step 40 Random / Equal-Max Winner Selection — `CloseCalculateRequest.winnerSelectionMode = "RANDOM_EQUAL_MAX"`: host selects lottery mode in close cycle modal; backend picks uniformly at random among all ALIVE shares, treats winning bid as group `maxBid`, and executes ledger formulas accordingly.
+- [x] Step 41 Disable Landing Page for Logged-In Users — Landing page (`/`) checks auth token & roles on mount; automatically redirects logged-in HOST to `/host`, MEMBER to `/app`, and ADMIN to `/admin` without flashing public marketing content.
+- [x] Step 42 Pagination & Filtering for Reports — Paginated + filtered `GET /groups/{id}/ledger` with optional query params (`cycleId`, `type`, `status`, `page`, `size`) and `PageMeta` envelope; responsive filter toolbar and pagination controls in host ledger page (`/host/groups/[id]/ledger`); full backward compatibility.
+- [x] New comprehensive tests in `Phase3FeatureTests.java` covering Steps 38, 40, and 42; release-gate zero-float invariant maintained; suite **233 pass**.
 
 ## Step 08 acceptance (2026-10-06)
 

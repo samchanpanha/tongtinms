@@ -15,6 +15,7 @@ import com.tongtin.ledger.repository.LedgerEntryRepository;
 import com.tongtin.members.entity.MemberProfile;
 import com.tongtin.members.repository.MemberProfileRepository;
 import com.tongtin.reports.dto.LedgerReportResponse;
+import com.tongtin.reports.dto.PageMeta;
 import com.tongtin.reports.dto.ProfitReportResponse;
 import java.util.Collection;
 import java.util.Comparator;
@@ -22,6 +23,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -90,6 +94,47 @@ public class ReportService {
                 group.getId(), group.getName(), group.getCurrency(), lines,
                 money.money(group.getCurrency(), totalIn),
                 money.money(group.getCurrency(), totalOut));
+    }
+
+    /** Step 42: Paginated + filtered ledger report. */
+    @Transactional(readOnly = true)
+    public LedgerReportResponse ledgerPaged(Long ownerId, Long groupId,
+                                            Long cycleId, String type, String status,
+                                            int page, int size) {
+        Group group = groupRepository.findByOwnerIdAndId(ownerId, groupId)
+                .orElseThrow(() -> new NotFoundException("group not found"));
+
+        Pageable pageable = PageRequest.of(page, Math.min(size, 200));
+        Page<LedgerEntry> entryPage = ledgerEntryRepository
+                .findByGroupIdFiltered(groupId, cycleId, type, status, pageable);
+
+        List<LedgerEntry> entries = entryPage.getContent();
+        Map<Long, Integer> cycleNoById = cycleNoById(groupId);
+        Map<Long, Long> allocatedById = allocatedByEntryId(
+                entries.stream().map(LedgerEntry::getId).toList());
+        Map<Long, GroupShare> shareById = sharesById(group);
+        Map<Long, MemberProfile> memberById = membersById(entries);
+
+        long totalIn = 0;
+        long totalOut = 0;
+        for (LedgerEntry e : entries) {
+            if ("IN".equals(e.getDirection())) totalIn += e.getAmountMinor();
+            else totalOut += e.getAmountMinor();
+        }
+
+        List<LedgerReportResponse.Entry> lines = entries.stream()
+                .map(e -> toLedgerLine(e, cycleNoById, allocatedById, shareById, memberById))
+                .toList();
+
+        PageMeta meta = new PageMeta(
+                entryPage.getNumber(), entryPage.getSize(),
+                entryPage.getTotalElements(), entryPage.getTotalPages());
+
+        return new LedgerReportResponse(
+                group.getId(), group.getName(), group.getCurrency(), lines,
+                money.money(group.getCurrency(), totalIn),
+                money.money(group.getCurrency(), totalOut),
+                meta);
     }
 
     @Transactional(readOnly = true)

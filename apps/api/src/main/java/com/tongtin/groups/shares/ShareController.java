@@ -1,7 +1,6 @@
 package com.tongtin.groups.shares;
 
 import com.tongtin.common.security.AuthPrincipal;
-import com.tongtin.groups.dto.GroupResponse;
 import com.tongtin.groups.shares.dto.ShareAssignRequest;
 import com.tongtin.groups.shares.dto.ShareResponse;
 import jakarta.validation.Valid;

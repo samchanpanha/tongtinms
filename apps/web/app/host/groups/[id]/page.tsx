@@ -33,6 +33,8 @@ import {
   Eye,
   QrCode,
   Zap,
+  Receipt,
+  Dices,
 } from "lucide-react";
 
 type GroupDetails = Awaited<ReturnType<typeof api.getGroup>>;
@@ -91,6 +93,12 @@ export default function GroupDetailPage({
   const [qrImageUrl, setQrImageUrl] = useState<string | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
   const [qrError, setQrError] = useState<string | null>(null);
+
+  // Step 40: Close cycle modal state
+  const [showCloseModal, setShowCloseModal] = useState(false);
+  const [closeCycleId, setCloseCycleId] = useState<number | null>(null);
+  const [winnerSelectionMode, setWinnerSelectionMode] = useState<"HIGHEST_BID" | "RANDOM_EQUAL_MAX">("HIGHEST_BID");
+  const [closingCycle, setClosingCycle] = useState(false);
 
   const reloadAll = () => setRefreshKey((k) => k + 1);
 
@@ -303,14 +311,25 @@ export default function GroupDetailPage({
     }
   };
 
-  const handleCloseAndCalc = async (cycleId: number) => {
+  const openCloseCycleModal = (cycleId: number) => {
+    setCloseCycleId(cycleId);
+    setWinnerSelectionMode("HIGHEST_BID");
+    setShowCloseModal(true);
+  };
+
+  const executeCloseCycle = async () => {
+    if (!closeCycleId) return;
     setActionError(null);
+    setClosingCycle(true);
     try {
-      await api.closeAndCalculate(cycleId);
+      await api.closeAndCalculate(closeCycleId, { winnerSelectionMode });
       setActionSuccess(t.hostGroupDetail.msgCloseSuccess);
+      setShowCloseModal(false);
       reloadAll();
     } catch (err: unknown) {
       setActionError(err instanceof Error ? err.message : t.hostGroupDetail.msgCloseError);
+    } finally {
+      setClosingCycle(false);
     }
   };
 
@@ -633,7 +652,7 @@ export default function GroupDetailPage({
                             {t.hostGroupDetail.enterBidForMemberBtn}
                           </button>
                           <button
-                            onClick={() => handleCloseAndCalc(c.id)}
+                            onClick={() => openCloseCycleModal(c.id)}
                             className="rounded-xl bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-500 cursor-pointer"
                           >
                             {t.hostGroupDetail.closeAndCalcBtn}
@@ -643,7 +662,7 @@ export default function GroupDetailPage({
 
                       {c.status === "OPEN" && (
                         <button
-                          onClick={() => handleCloseAndCalc(c.id)}
+                          onClick={() => openCloseCycleModal(c.id)}
                           className="rounded-xl bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-500 cursor-pointer"
                         >
                           {t.hostGroupDetail.closeAndCalcBtn}
@@ -909,6 +928,14 @@ export default function GroupDetailPage({
                       </div>
 
                       <div className="flex shrink-0 items-center gap-2">
+                        <Link
+                          href={`/host/groups/${id}/payments/${p.id}/invoice`}
+                          target="_blank"
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700 transition-all shadow-sm"
+                        >
+                          <Receipt className="h-3.5 w-3.5 text-emerald-600" />
+                          Hoá đơn
+                        </Link>
                         <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 dark:border-emerald-700/60 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/70">
                           {uploadingPaymentId === p.id ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -967,6 +994,116 @@ export default function GroupDetailPage({
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Close Cycle / Winner Selection */}
+      {showCloseModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl border border-zinc-200 bg-white p-6 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="flex items-center justify-between pb-4 border-b border-zinc-100 dark:border-zinc-800">
+              <div className="flex items-center gap-2">
+                <Dices className="h-5 w-5 text-emerald-600" />
+                <h3 className="font-bold text-base text-zinc-900 dark:text-zinc-50">
+                  Chốt kỳ & Chọn người hốt hụi
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowCloseModal(false)}
+                className="rounded-xl p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="mt-5 space-y-4">
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                Vui lòng chọn phương thức xác định người hốt hụi cho kỳ này:
+              </p>
+
+              <div className="space-y-3">
+                <label
+                  onClick={() => setWinnerSelectionMode("HIGHEST_BID")}
+                  className={`flex items-start gap-3 rounded-2xl border p-4 cursor-pointer transition-all ${
+                    winnerSelectionMode === "HIGHEST_BID"
+                      ? "border-emerald-500 bg-emerald-50/50 dark:border-emerald-500 dark:bg-emerald-950/30"
+                      : "border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-800/40"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="winnerMode"
+                    checked={winnerSelectionMode === "HIGHEST_BID"}
+                    onChange={() => setWinnerSelectionMode("HIGHEST_BID")}
+                    className="mt-1 text-emerald-600"
+                  />
+                  <div>
+                    <p className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">
+                      Đấu giá cao nhất (Mặc định)
+                    </p>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                      Hội viên bỏ giá cao nhất sẽ giành quyền hốt hụi theo quy tắc nhóm.
+                    </p>
+                  </div>
+                </label>
+
+                <label
+                  onClick={() => setWinnerSelectionMode("RANDOM_EQUAL_MAX")}
+                  className={`flex items-start gap-3 rounded-2xl border p-4 cursor-pointer transition-all ${
+                    winnerSelectionMode === "RANDOM_EQUAL_MAX"
+                      ? "border-emerald-500 bg-emerald-50/50 dark:border-emerald-500 dark:bg-emerald-950/30"
+                      : "border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-800/40"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="winnerMode"
+                    checked={winnerSelectionMode === "RANDOM_EQUAL_MAX"}
+                    onChange={() => setWinnerSelectionMode("RANDOM_EQUAL_MAX")}
+                    className="mt-1 text-emerald-600"
+                  />
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <p className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">
+                        Bốc thăm ngẫu nhiên (Giá tối đa)
+                      </p>
+                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300">
+                        Mới
+                      </span>
+                    </div>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                      Dành cho trường hợp không ai bỏ giá hoặc quay số bình đẳng. Tất cả chân hụi sống được coi như bỏ giá trần (max amount), hệ thống bốc thăm ngẫu nhiên người trúng.
+                    </p>
+                  </div>
+                </label>
+              </div>
+
+              <div className="pt-4 flex items-center justify-end gap-3 border-t border-zinc-100 dark:border-zinc-800">
+                <button
+                  type="button"
+                  onClick={() => setShowCloseModal(false)}
+                  className="rounded-xl border border-zinc-200 px-4 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                >
+                  Huỷ
+                </button>
+                <button
+                  type="button"
+                  onClick={executeCloseCycle}
+                  disabled={closingCycle}
+                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-emerald-500 disabled:opacity-50"
+                >
+                  {closingCycle ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Đang xử lý...
+                    </>
+                  ) : (
+                    "Xác nhận chốt kỳ"
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

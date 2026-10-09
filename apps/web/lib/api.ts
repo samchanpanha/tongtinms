@@ -100,6 +100,43 @@ export interface PaymentRecord {
   attachments: AttachmentMeta[];
 }
 
+/** Step 38: Invoice DTO from GET /groups/{id}/payments/{paymentId}/invoice */
+export interface InvoiceResponse {
+  invoiceNo: string;
+  issuedAt: string;
+  group: { id: number; code: string; name: string; currency: string };
+  host: { displayName: string; bankName: string | null; bankAccount: string | null; accountHolder: string | null; phone: string | null };
+  payer: { memberProfileId: number | null; memberName: string; phone: string | null };
+  payment: { amountMinor: number; currency: string; method: string; paidAt: string; note: string | null };
+  lines: Array<{ description: string; cycleNo: number | null; type: string; direction: string; amountMinor: number; allocatedMinor: number }>;
+  totalAllocatedMinor: number;
+  currency: string;
+}
+
+/** Step 42: Paginated ledger response */
+export interface LedgerPagedResponse {
+  groupId: number;
+  groupName: string;
+  currency: string;
+  entries: Array<{
+    entryId: number;
+    cycleNo: number;
+    type: string;
+    direction: string;
+    shareNo: number | null;
+    memberProfileId: number | null;
+    memberName: string | null;
+    amount: { currency: string; amountMinor: number; exponent: number; symbol: string };
+    status: string;
+    dueAt: string | null;
+    allocated: { currency: string; amountMinor: number; exponent: number; symbol: string };
+    remaining: { currency: string; amountMinor: number; exponent: number; symbol: string };
+  }>;
+  totalIn: { currency: string; amountMinor: number; exponent: number; symbol: string };
+  totalOut: { currency: string; amountMinor: number; exponent: number; symbol: string };
+  page: { number: number; size: number; totalElements: number; totalPages: number } | null;
+}
+
 const TOKEN_KEY = "tongtin_access_token";
 const USER_KEY = "tongtin_auth_data";
 
@@ -473,10 +510,19 @@ export const api = {
     });
   },
 
-  async closeAndCalculate(cycleId: number | string, winnerShareId?: number) {
+  async closeAndCalculate(
+    cycleId: number | string,
+    options?: { winnerShareId?: number; winnerSelectionMode?: string } | number
+  ) {
+    let body: string | undefined = undefined;
+    if (typeof options === "number") {
+      body = JSON.stringify({ winnerShareId: options });
+    } else if (options && typeof options === "object") {
+      body = JSON.stringify(options);
+    }
     return request(`/cycles/${cycleId}/close-and-calculate`, {
       method: "POST",
-      body: winnerShareId ? JSON.stringify({ winnerShareId }) : undefined,
+      body,
     });
   },
 
@@ -1000,5 +1046,24 @@ export const api = {
     eventsConfigured: boolean;
   }> {
     return request("/host/telegram/test", { method: "POST" });
+  },
+
+  // Step 38: Payment invoice
+  async getPaymentInvoice(groupId: number, paymentId: number): Promise<InvoiceResponse> {
+    return request(`/groups/${groupId}/payments/${paymentId}/invoice`);
+  },
+
+  // Step 42: Paginated + filtered ledger
+  async getLedgerPaged(
+    groupId: number,
+    params: { cycleId?: number; type?: string; status?: string; page?: number; size?: number }
+  ): Promise<LedgerPagedResponse> {
+    const query = new URLSearchParams();
+    if (params.cycleId != null) query.set("cycleId", String(params.cycleId));
+    if (params.type) query.set("type", params.type);
+    if (params.status) query.set("status", params.status);
+    if (params.page != null) query.set("page", String(params.page));
+    if (params.size != null) query.set("size", String(params.size));
+    return request(`/groups/${groupId}/ledger?${query.toString()}`);
   },
 };
